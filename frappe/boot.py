@@ -127,7 +127,6 @@ def get_user_pages_or_reports(parent, cache=False):
 			return has_role
 
 	roles = frappe.get_roles()
-	has_role = {}
 	column = get_column(parent)
 
 	# get pages or reports set on custom role
@@ -146,9 +145,14 @@ def get_user_pages_or_reports(parent, cache=False):
 	""".format(field=parent.lower(), parent=parent, column=column,
 		roles = ', '.join(['%s']*len(roles))), roles, as_dict=1)
 
-	for p in pages_with_custom_roles:
-		has_role[p.name] = {"modified":p.modified, "title": p.title, "ref_doctype": p.ref_doctype}
-
+	has_role = {
+	    p.name: {
+	        "modified": p.modified,
+	        "title": p.title,
+	        "ref_doctype": p.ref_doctype,
+	    }
+	    for p in pages_with_custom_roles
+	}
 	pages_with_standard_roles = frappe.db.sql("""
 		select distinct
 			`tab{parent}`.name as name,
@@ -201,11 +205,9 @@ def get_user_pages_or_reports(parent, cache=False):
 	return has_role
 
 def get_column(doctype):
-	column = "`tabPage`.title as title"
-	if doctype == "Report":
-		column = "`tabReport`.`name` as title, `tabReport`.ref_doctype, `tabReport`.report_type"
-
-	return column
+	return (
+	    "`tabReport`.`name` as title, `tabReport`.ref_doctype, `tabReport`.report_type"
+	    if doctype == "Report" else "`tabPage`.title as title")
 
 def load_translations(bootinfo):
 	messages = frappe.get_lang_dict("boot")

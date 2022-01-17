@@ -176,7 +176,7 @@ def get_references_across_doctypes(to_doctypes: List[str]=None, limit_link_docty
 	if limit_link_doctypes:
 		child_tables_by_doctype = get_child_tables_of_doctypes(limit_link_doctypes)
 		all_child_tables = [each['child_table'] for each in itertools.chain(*child_tables_by_doctype.values())]
-		limit_link_doctypes = limit_link_doctypes + all_child_tables
+		limit_link_doctypes += all_child_tables
 	else:
 		child_tables_by_doctype = get_child_tables_of_doctypes()
 		all_child_tables = [each['child_table'] for each in itertools.chain(*child_tables_by_doctype.values())]
@@ -300,7 +300,9 @@ def get_referencing_documents(reference_doctype: str, reference_names: List[str]
 	for parent, rows in itertools.groupby(res, key = lambda row: row['parenttype']):
 		if allowed_parents and parent not in allowed_parents:
 			continue
-		filters = (parent_filters or []) + [['name', 'in', tuple([row.parent for row in rows])]]
+		filters = ((parent_filters or [])) + [[
+		    'name', 'in', tuple(row.parent for row in rows)
+		]]
 		documents[parent].extend(frappe.db.get_all(parent, filters=filters, pluck='name') or [])
 	return documents
 
@@ -360,10 +362,7 @@ def validate_linked_doc(docinfo, ignore_doctypes_on_cancel_all=None):
 
 def get_exempted_doctypes():
 	""" Get list of doctypes exempted from being auto-cancelled """
-	auto_cancel_exempt_doctypes = []
-	for doctypes in frappe.get_hooks('auto_cancel_exempted_doctypes'):
-		auto_cancel_exempt_doctypes.append(doctypes)
-	return auto_cancel_exempt_doctypes
+	return list(frappe.get_hooks('auto_cancel_exempted_doctypes'))
 
 
 @frappe.whitelist()
@@ -392,7 +391,6 @@ def get_linked_docs(doctype, name, linkinfo=None, for_doctype=None):
 	me = frappe.db.get_value(doctype, name, ["parenttype", "parent"], as_dict=True)
 
 	for dt, link in linkinfo.items():
-		filters = []
 		link["doctype"] = dt
 		link_meta_bundle = frappe.desk.form.load.get_meta_bundle(dt)
 		linkmeta = link_meta_bundle[0]
@@ -408,6 +406,7 @@ def get_linked_docs(doctype, name, linkinfo=None, for_doctype=None):
 			fields = ["`tab{dt}`.`{fn}`".format(dt=dt, fn=sf.strip()) for sf in fields if sf
 				and "`tab" not in sf]
 
+			filters = []
 			try:
 				if link.get("filters"):
 					ret = frappe.get_all(doctype=dt, fields=fields, filters=link.get("filters"))

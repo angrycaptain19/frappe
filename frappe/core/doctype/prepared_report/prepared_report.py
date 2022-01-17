@@ -68,13 +68,12 @@ def run_background(prepared_report):
 
 @frappe.whitelist()
 def get_reports_in_queued_state(report_name, filters):
-	reports = frappe.get_all('Prepared Report',
+	return frappe.get_all('Prepared Report',
 		filters = {
 			'report_name': report_name,
 			'filters': json.dumps(json.loads(filters)),
 			'status': 'Queued'
 		})
-	return reports
 
 def delete_expired_prepared_reports():
 	system_settings = frappe.get_single('System Settings')

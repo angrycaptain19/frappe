@@ -23,7 +23,7 @@ def print_has_permission_check_logs(func):
 		frappe.flags['has_permission_check_logs'] = []
 		result = func(*args, **kwargs)
 		self_perm_check = True if not kwargs.get('user') else kwargs.get('user') == frappe.session.user
-		raise_exception = False if kwargs.get('raise_exception') == False else True
+		raise_exception = kwargs.get('raise_exception') != False
 
 		# print only if access denied
 		# and if user is checking his own permission
@@ -83,9 +83,9 @@ def has_permission(doctype, ptype="read", doc=None, verbose=False, user=None, ra
 
 			if doc:
 				doc_name = get_doc_name(doc)
-				if doc_name in shared:
-					if ptype in ("read", "write", "share", "submit") or meta.permissions[0].get(ptype):
-						return True
+				if doc_name in shared and (ptype in ("read", "write", "share", "submit")
+				                           or meta.permissions[0].get(ptype)):
+					return True
 
 			elif shared:
 				# if atleast one shared doc of that type, then return True
@@ -319,7 +319,7 @@ def get_valid_perms(doctype=None, user=None):
 
 	doctypes_with_custom_perms = get_doctypes_with_custom_docperms()
 	for p in perms:
-		if not p.parent in doctypes_with_custom_perms:
+		if p.parent not in doctypes_with_custom_perms:
 			custom_perms.append(p)
 
 	if doctype:
@@ -349,12 +349,11 @@ def get_roles(user=None, with_standard=True):
 	def get():
 		if user == 'Administrator':
 			return frappe.get_all("Role", pluck="name") # return all available roles
-		else:
-			table = DocType("Has Role")
-			roles = frappe.qb.from_(table).where(
-				(table.parent == user) & (table.role.notin(["All", "Guest"]))
-			).select(table.role).run(pluck=True)
-			return roles + ['All', 'Guest']
+		table = DocType("Has Role")
+		roles = frappe.qb.from_(table).where(
+			(table.parent == user) & (table.role.notin(["All", "Guest"]))
+		).select(table.role).run(pluck=True)
+		return roles + ['All', 'Guest']
 
 	roles = frappe.cache().hget("roles", user, get)
 
@@ -448,13 +447,12 @@ def can_import(doctype, raise_exception=False):
 def can_export(doctype, raise_exception=False):
 	if "System Manager" in frappe.get_roles():
 		return True
-	else:
-		role_permissions = frappe.permissions.get_role_permissions(doctype)
-		has_access = role_permissions.get('export') or \
-			role_permissions.get('if_owner').get('export')
-		if not has_access and raise_exception:
-			raise frappe.PermissionError(_("You are not allowed to export {} doctype").format(doctype))
-		return has_access
+	role_permissions = frappe.permissions.get_role_permissions(doctype)
+	has_access = role_permissions.get('export') or \
+		role_permissions.get('if_owner').get('export')
+	if not has_access and raise_exception:
+		raise frappe.PermissionError(_("You are not allowed to export {} doctype").format(doctype))
+	return has_access
 
 def update_permission_property(doctype, role, permlevel, ptype, value=None, validate=True):
 	'''Update a property in Custom Perm'''
@@ -537,8 +535,7 @@ def allow_everything():
 	returns a dict with access to everything
 	eg. {"read": 1, "write": 1, ...}
 	'''
-	perm = {ptype: 1 for ptype in rights}
-	return perm
+	return {ptype: 1 for ptype in rights}
 
 def get_allowed_docs_for_doctype(user_permissions, doctype):
 	''' Returns all the docs from the passed user_permissions that are
@@ -559,7 +556,7 @@ def filter_allowed_docs_for_doctype(user_permissions, doctype, with_default_doc=
 	return (allowed_doc, default_doc) if with_default_doc else allowed_doc
 
 def push_perm_check_log(log):
-	if frappe.flags.get('has_permission_check_logs') == None: return
+	if frappe.flags.get('has_permission_check_logs') is None: return
 	frappe.flags.get('has_permission_check_logs').append(_(log))
 
 def has_child_table_permission(child_doctype, ptype="read", child_doc=None,

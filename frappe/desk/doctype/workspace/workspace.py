@@ -139,7 +139,6 @@ def save_page(title, icon, parent, public, sb_public_items, sb_private_items, de
 		else:
 			doc.label = title + "-" + frappe.session.user
 			doc.for_user = frappe.session.user
-		doc.save(ignore_permissions=True)
 	else:
 		if public:
 			filters = {
@@ -156,8 +155,7 @@ def save_page(title, icon, parent, public, sb_public_items, sb_private_items, de
 			doc = frappe.get_doc("Workspace", pages[0])
 
 		doc.content = blocks
-		doc.save(ignore_permissions=True)
-
+	doc.save(ignore_permissions=True)
 	if loads(new_widgets):
 		save_new_widget(doc, title, blocks, new_widgets)
 

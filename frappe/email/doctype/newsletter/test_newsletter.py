@@ -61,8 +61,8 @@ class TestNewsletterMixin:
 				"title": "_Test Email Group"
 			}).insert()
 
+		doctype = "Email Group Member"
 		for email in emails:
-			doctype = "Email Group Member"
 			email_filters = {
 				"email": email,
 				"email_group": "_Test Email Group"

@@ -30,9 +30,8 @@ def get_permission_query_conditions(for_user):
 def get_title(doctype, docname, title_field=None):
 	if not title_field:
 		title_field = frappe.get_meta(doctype).get_title_field()
-	title = docname if title_field == "name" else \
+	return docname if title_field == "name" else \
 		frappe.db.get_value(doctype, docname, title_field)
-	return title
 
 def get_title_html(title):
 	return '<b class="subject-title">{0}</b>'.format(title)
@@ -63,16 +62,18 @@ def make_notification_logs(doc, users):
 	from frappe.social.doctype.energy_point_settings.energy_point_settings import is_energy_point_enabled
 
 	for user in users:
-		if frappe.db.exists('User', {"email": user, "enabled": 1}):
-			if is_notifications_enabled(user):
-				if doc.type == 'Energy Point' and not is_energy_point_enabled():
-					return
+		if frappe.db.exists('User', {
+		    "email": user,
+		    "enabled": 1
+		}) and is_notifications_enabled(user):
+			if doc.type == 'Energy Point' and not is_energy_point_enabled():
+				return
 
-				_doc = frappe.new_doc('Notification Log')
-				_doc.update(doc)
-				_doc.for_user = user
-				if _doc.for_user != _doc.from_user or doc.type == 'Energy Point' or doc.type == 'Alert':
-					_doc.insert(ignore_permissions=True)
+			_doc = frappe.new_doc('Notification Log')
+			_doc.update(doc)
+			_doc.for_user = user
+			if _doc.for_user != _doc.from_user or doc.type == 'Energy Point' or doc.type == 'Alert':
+				_doc.insert(ignore_permissions=True)
 
 def send_notification_email(doc):
 

@@ -72,7 +72,7 @@ def get_permissions(doctype=None, role=None):
 
 	linked_doctypes = {}
 	for d in out:
-		if not d.parent in linked_doctypes:
+		if d.parent not in linked_doctypes:
 			linked_doctypes[d.parent] = get_linked_doctypes(d.parent)
 		d.linked_doctypes = linked_doctypes[d.parent]
 		meta = frappe.get_meta(d.parent)

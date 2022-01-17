@@ -52,10 +52,8 @@ def create_new_connection(module, connection_name):
 
 	# get python module string from file_path
 	app_name = frappe.db.get_value('Module Def', module, 'app_name')
-	python_module = os.path.relpath(
+	return os.path.relpath(
 		file_path, '../apps/{0}'.format(app_name)).replace(os.path.sep, '.')[:-3]
-
-	return python_module
 
 def get_connection_class(python_module):
 	filename = python_module.rsplit('.', 1)[-1]

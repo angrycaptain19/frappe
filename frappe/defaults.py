@@ -47,10 +47,7 @@ def get_user_default_as_list(key, user=None):
 
 	d = list(filter(None, (not isinstance(d, (list, tuple))) and [d] or d))
 
-	# filter default values if not found in user permission
-	values = [value for value in d if not not_in_user_permission(key, value)]
-
-	return values
+	return [value for value in d if not not_in_user_permission(key, value)]
 
 def is_a_user_permission_key(key):
 	return ":" not in key and key != frappe.scrub(key)
@@ -65,7 +62,7 @@ def not_in_user_permission(key, value, user=None):
 		if perm.get('doc') == value: return False
 
 	# return true only if user_permission exists
-	return True if user_permission else False
+	return bool(user_permission)
 
 def get_user_permissions(user=None):
 	from frappe.core.doctype.user_permission.user_permission \
@@ -155,21 +152,16 @@ def clear_default(key=None, value=None, parent=None, name=None, parenttype=None)
 	filters = {}
 
 	if name:
-		filters.update({"name": name})
-
+		filters["name"] = name
 	else:
 		if key:
-			filters.update({"defkey": key})
-
+			filters["defkey"] = key
 		if value:
-			filters.update({"defvalue": value})
-
+			filters["defvalue"] = value
 		if parent:
-			filters.update({"parent": parent})
-
+			filters["parent"] = parent
 		if parenttype:
-			filters.update({"parenttype": parenttype})
-
+			filters["parenttype"] = parenttype
 	if parent:
 		clear_defaults_cache(parent)
 	else:
@@ -187,7 +179,7 @@ def get_defaults_for(parent="__default"):
 	"""get all defaults"""
 	defaults = frappe.cache().hget("defaults", parent)
 
-	if defaults==None:
+	if defaults is None:
 		# sort descending because first default must get precedence
 		table = DocType("DefaultValue")
 		res = frappe.qb.from_(table).where(

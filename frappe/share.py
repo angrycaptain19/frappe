@@ -69,16 +69,13 @@ def set_permission(doctype, name, user, permission_to, value=1, everyone=0):
 		else:
 			# no share found, nothing to remove
 			share = {}
-			pass
 	else:
 		share = frappe.get_doc("DocShare", share_name)
 		share.flags.ignore_permissions = True
 		share.set(permission_to, value)
 
-		if not value:
-			# un-set higher-order permissions too
-			if permission_to=="read":
-				share.read = share.write = share.submit = share.share = 0
+		if not value and permission_to == "read":
+			share.read = share.write = share.submit = share.share = 0
 
 		share.save()
 
@@ -135,14 +132,21 @@ def get_shared_doctypes(user=None):
 	return query.run(pluck=True)
 
 def get_share_name(doctype, name, user, everyone):
-	if cint(everyone):
-		share_name = frappe.db.get_value("DocShare", {"everyone": 1, "share_name": name,
-			"share_doctype": doctype})
-	else:
-		share_name = frappe.db.get_value("DocShare", {"user": user, "share_name": name,
-			"share_doctype": doctype})
-
-	return share_name
+	return (frappe.db.get_value(
+	    "DocShare",
+	    {
+	        "everyone": 1,
+	        "share_name": name,
+	        "share_doctype": doctype
+	    },
+	) if cint(everyone) else frappe.db.get_value(
+	    "DocShare",
+	    {
+	        "user": user,
+	        "share_name": name,
+	        "share_doctype": doctype
+	    },
+	))
 
 def check_share_permission(doctype, name):
 	"""Check if the user can share with other users"""

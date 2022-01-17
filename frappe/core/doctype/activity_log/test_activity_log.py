@@ -43,8 +43,7 @@ class TestActivityLog(unittest.TestCase):
 		}, order_by='`creation` DESC')
 
 		name = names[0]
-		auth_log = frappe.get_doc('Activity Log', name)
-		return auth_log
+		return frappe.get_doc('Activity Log', name)
 
 	def test_brute_security(self):
 		update_system_settings({

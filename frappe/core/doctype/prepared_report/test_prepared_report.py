@@ -28,5 +28,5 @@ class TestPreparedReport(unittest.TestCase):
 		self.prepared_report_doc.delete()
 
 	def test_for_creation(self):
-		self.assertTrue('QUEUED' == self.prepared_report_doc.status.upper())
+		self.assertTrue(self.prepared_report_doc.status.upper() == 'QUEUED')
 		self.assertTrue(self.prepared_report_doc.report_start_time)

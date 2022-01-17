@@ -48,7 +48,6 @@ def download_file(url, prefix):
 def build_missing_files():
 	'''Check which files dont exist yet from the assets.json and run build for those files'''
 
-	missing_assets = []
 	current_asset_files = []
 
 	for type in ["css", "js"]:
@@ -62,6 +61,7 @@ def build_missing_files():
 	if assets_json:
 		assets_json = frappe.parse_json(assets_json)
 
+		missing_assets = []
 		for bundle_file, output_file in assets_json.items():
 			if not output_file.startswith('/assets/frappe'):
 				continue
@@ -278,15 +278,14 @@ def check_node_executable():
 	click.echo()
 
 def get_node_env():
-	node_env = {
+	return {
 		"NODE_OPTIONS": f"--max_old_space_size={get_safe_max_old_space_size()}"
 	}
-	return node_env
 
 def get_safe_max_old_space_size():
 	safe_max_old_space_size = 0
 	try:
-		total_memory = psutil.virtual_memory().total / (1024 * 1024)
+		total_memory = psutil.virtual_memory().total / 1024**2
 		# reference for the safe limit assumption
 		# https://nodejs.org/api/cli.html#cli_max_old_space_size_size_in_megabytes
 		# set minimum value 1GB
@@ -354,11 +353,7 @@ def unstrip(message: str) -> str:
 	except Exception:
 		max_str = 80
 
-	if _len < max_str:
-		_rem = max_str - _len
-	else:
-		_rem = max_str % _len
-
+	_rem = max_str - _len if _len < max_str else max_str % _len
 	return f"{message}{' ' * _rem}"
 
 
@@ -461,7 +456,7 @@ def pack(target, sources, no_compress, verbose):
 					outtxt += str(minified or "", "utf-8").strip("\n") + ";"
 
 				if verbose:
-					print("{0}: {1}k".format(f, int(len(minified) / 1024)))
+					print("{0}: {1}k".format(f, len(minified) // 1024))
 			elif outtype == "js" and extn == "html":
 				# add to frappe.templates
 				outtxt += html_to_js_template(f, data)
@@ -506,8 +501,7 @@ def files_dirty():
 			if os.path.getmtime(f) != timestamps.get(f):
 				print(f + " dirty")
 				return True
-	else:
-		return False
+	return False
 
 
 def compile_less():

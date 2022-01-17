@@ -74,7 +74,7 @@ class DocTags:
 	def add(self, dn, tag):
 		"""add a new user tag"""
 		tl = self.get_tags(dn).split(',')
-		if not tag in tl:
+		if tag not in tl:
 			tl.append(tag)
 			if not frappe.db.exists("Tag", tag):
 				frappe.get_doc({"doctype": "Tag", "name": tag}).insert(ignore_permissions=True)
@@ -168,20 +168,14 @@ def get_documents_for_tag(tag):
 		Search for given text in Tag Link
 		:param tag: tag to be searched
 	"""
-	# remove hastag `#` from tag
 	tag = tag[1:]
-	results = []
-
 	result = frappe.get_list("Tag Link", filters={"tag": tag}, fields=["document_type", "document_name", "title", "tag"])
 
-	for res in result:
-		results.append({
+	return [{
 			"doctype": res.document_type,
 			"name": res.document_name,
 			"content": res.title
-		})
-
-	return results
+		} for res in result]
 
 @frappe.whitelist()
 def get_tags_list_for_awesomebar():

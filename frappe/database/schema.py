@@ -52,15 +52,12 @@ class DBTable:
 		return ret
 
 	def get_index_definitions(self):
-		ret = []
-		for key, col in self.columns.items():
-			if (col.set_index
-				and not col.unique
-				and col.fieldtype in frappe.db.type_map
-				and frappe.db.type_map.get(col.fieldtype)[0]
-				not in ('text', 'longtext')):
-				ret.append('index `' + key + '`(`' + key + '`)')
-		return ret
+		return [
+		    'index `' + key + '`(`' + key + '`)' for key, col in self.columns.items()
+		    if
+		    (col.set_index and not col.unique and col.fieldtype in frappe.db.type_map
+		     and frappe.db.type_map.get(col.fieldtype)[0] not in ('text', 'longtext'))
+		]
 
 	def get_columns_from_docfields(self):
 		"""
@@ -224,9 +221,9 @@ class DbColumn:
 
 		# default
 		if (self.default_changed(current_def)
-			and (self.default not in frappe.db.DEFAULT_SHORTCUTS)
-			and not cstr(self.default).startswith(":")
-			and not (column_type in ['text','longtext'])):
+		    and self.default not in frappe.db.DEFAULT_SHORTCUTS
+		    and not cstr(self.default).startswith(":")
+		    and column_type not in ['text', 'longtext']):
 			self.table.set_default.append(self)
 
 		# index should be applied or dropped irrespective of type change
@@ -235,30 +232,32 @@ class DbColumn:
 			# to drop unique you have to drop index
 			self.table.drop_index.append(self)
 
-		elif (not current_def['index'] and self.set_index) and not (column_type in ('text', 'longtext')):
+		elif (not current_def['index'] and self.set_index) and column_type not in (
+		      'text',
+		      'longtext',
+		  ):
 			self.table.add_index.append(self)
 
 	def default_changed(self, current_def):
 		if "decimal" in current_def['type']:
 			return self.default_changed_for_decimal(current_def)
+		cur_default = current_def['default']
+		new_default = self.default
+		if cur_default == "NULL" or cur_default is None:
+			cur_default = None
 		else:
-			cur_default = current_def['default']
-			new_default = self.default
-			if cur_default == "NULL" or cur_default is None:
-				cur_default = None
-			else:
-				# Strip quotes from default value
-				# eg. database returns default value as "'System Manager'"
-				cur_default = cur_default.lstrip("'").rstrip("'")
+			# Strip quotes from default value
+			# eg. database returns default value as "'System Manager'"
+			cur_default = cur_default.lstrip("'").rstrip("'")
 
-			fieldtype = self.fieldtype
-			if fieldtype in ['Int', 'Check']:
-				cur_default = cint(cur_default)
-				new_default = cint(new_default)
-			elif fieldtype in ['Currency', 'Float', 'Percent']:
-				cur_default = flt(cur_default)
-				new_default = flt(new_default)
-			return cur_default != new_default
+		fieldtype = self.fieldtype
+		if fieldtype in ['Int', 'Check']:
+			cur_default = cint(cur_default)
+			new_default = cint(new_default)
+		elif fieldtype in ['Currency', 'Float', 'Percent']:
+			cur_default = flt(cur_default)
+			new_default = flt(new_default)
+		return cur_default != new_default
 
 	def default_changed_for_decimal(self, current_def):
 		try:
@@ -306,7 +305,7 @@ def get_definition(fieldtype, precision=None, length=None):
 	if not d: return
 
 	coltype = d[0]
-	size = d[1] if d[1] else None
+	size = d[1] or None
 
 	if size:
 		# This check needs to exist for backward compatibility.

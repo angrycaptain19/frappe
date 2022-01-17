@@ -29,9 +29,7 @@ class DbManager:
 		try:
 			self.db.sql("DROP USER '%s'@'%s';" % (target, host))
 		except Exception as e:
-			if e.args[0] == 1396:
-				pass
-			else:
+			if e.args[0] != 1396:
 				raise
 
 	def create_database(self, target):

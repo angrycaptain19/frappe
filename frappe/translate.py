@@ -121,8 +121,13 @@ def set_default_language(lang):
 
 def get_lang_dict():
 	"""Returns all languages in dict format, full name is the key e.g. `{"english":"en"}`"""
-	result = dict(frappe.get_all("Language", fields=["language_name", "name"], order_by="modified", as_list=True))
-	return result
+	return dict(
+	    frappe.get_all(
+	        "Language",
+	        fields=["language_name", "name"],
+	        order_by="modified",
+	        as_list=True,
+	    ))
 
 def get_dict(fortype, name=None):
 	"""Returns translation dict for a type of object.
@@ -135,7 +140,7 @@ def get_dict(fortype, name=None):
 	asset_key = fortype + ":" + (name or "-")
 	translation_assets = cache.hget("translation_assets", frappe.local.lang, shared=True) or {}
 
-	if not asset_key in translation_assets:
+	if asset_key not in translation_assets:
 		messages = []
 		if fortype=="doctype":
 			messages = get_messages_from_doctype(name)
@@ -206,7 +211,7 @@ def make_dict_from_messages(messages, full_dict=None, load_user_translation=True
 	:param messages: List of untranslated messages
 	"""
 	out = {}
-	if full_dict==None:
+	if full_dict is None:
 		if load_user_translation:
 			full_dict = get_full_dict(frappe.local.lang)
 		else:
@@ -414,7 +419,7 @@ def get_messages_from_doctype(name):
 
 		if d.fieldtype=='Select' and d.options:
 			options = d.options.split('\n')
-			if not "icon" in options[0]:
+			if "icon" not in options[0]:
 				messages.extend(options)
 		if d.fieldtype=='HTML' and d.options:
 			messages.append(d.options)
@@ -643,12 +648,9 @@ def extract_messages_from_code(code):
 	try:
 		code = frappe.as_unicode(render_include(code))
 
-	# Exception will occur when it encounters John Resig's microtemplating code
 	except (TemplateError, ImportError, InvalidIncludePath, IOError) as e:
 		if isinstance(e, InvalidIncludePath):
 			frappe.clear_last_message()
-
-		pass
 
 	messages = []
 	pattern = r"_\(([\"']{,3})(?P<message>((?!\1).)*)\1(\s*,\s*context\s*=\s*([\"'])(?P<py_context>((?!\5).)*)\5)*(\s*,\s*(.)*?\s*(,\s*([\"'])(?P<js_context>((?!\11).)*)\11)*)*\)"
@@ -664,9 +666,9 @@ def extract_messages_from_code(code):
 	return add_line_number(messages, code)
 
 def is_translatable(m):
-	if re.search("[a-zA-Z]", m) and not m.startswith("fa fa-") and not m.endswith("px") and not m.startswith("eval:"):
-		return True
-	return False
+	return bool(
+	    re.search("[a-zA-Z]", m) and not m.startswith("fa fa-")
+	    and not m.endswith("px") and not m.startswith("eval:"))
 
 def add_line_number(messages, code):
 	ret = []
@@ -688,7 +690,7 @@ def read_csv_file(path):
 
 	with io.open(path, mode='r', encoding='utf-8', newline='') as msgfile:
 		data = reader(msgfile)
-		newdata = [[val for val in row] for row in data]
+		newdata = [list(row) for row in data]
 
 	return newdata
 
@@ -836,12 +838,9 @@ def send_translations(translation_dict):
 	frappe.local.response["__messages"].update(translation_dict)
 
 def deduplicate_messages(messages):
-	ret = []
 	op = operator.itemgetter(1)
 	messages = sorted(messages, key=op)
-	for k, g in itertools.groupby(messages, op):
-		ret.append(next(g))
-	return ret
+	return [next(g) for k, g in itertools.groupby(messages, op)]
 
 def rename_language(old_name, new_name):
 	if not frappe.db.exists('Language', new_name):
@@ -904,9 +903,8 @@ def get_translations(source_text):
 def get_messages(language, start=0, page_length=100, search_text=''):
 	from frappe.frappeclient import FrappeClient
 	translator = FrappeClient(get_translator_url())
-	translated_dict = translator.post_api('translator.api.get_strings_for_translation', params=locals())
-
-	return translated_dict
+	return translator.post_api(
+	    'translator.api.get_strings_for_translation', params=locals())
 
 
 @frappe.whitelist()
@@ -926,10 +924,9 @@ def get_contribution_status(message_id):
 	from frappe.frappeclient import FrappeClient
 	doc = frappe.get_doc('Translation', message_id)
 	translator = FrappeClient(get_translator_url())
-	contributed_translation = translator.get_api('translator.api.get_contribution_status', params={
+	return translator.get_api('translator.api.get_contribution_status', params={
 		'translation_id': doc.contribution_docname
 	})
-	return contributed_translation
 
 def get_translator_url():
 	return frappe.get_hooks()['translator_url'][0]

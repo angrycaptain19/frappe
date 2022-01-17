@@ -114,9 +114,11 @@ def user_permission_exists(user, allow, for_value, applicable_for=None):
 	'''Checks if similar user permission already exists'''
 	user_permissions = get_user_permissions(user).get(allow, [])
 	if not user_permissions: return None
-	has_same_user_permission = find(user_permissions, lambda perm:perm["doc"] == for_value and perm.get('applicable_for') == applicable_for)
-
-	return has_same_user_permission
+	return find(
+	    user_permissions,
+	    lambda perm: perm["doc"] == for_value and perm.get('applicable_for') ==
+	    applicable_for,
+	)
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
@@ -137,11 +139,7 @@ def get_applicable_for_doctype_list(doctype, txt, searchfield, start, page_len, 
 
 	linked_doctypes.sort()
 
-	return_list = []
-	for doctype in linked_doctypes[start:page_len]:
-		return_list.append([doctype])
-
-	return return_list
+	return [[doctype] for doctype in linked_doctypes[start:page_len]]
 
 def get_permitted_documents(doctype):
 	''' Returns permitted documents from the given doctype for the session user '''
@@ -213,10 +211,8 @@ def add_user_permissions(data):
 	elif len(data.applicable_doctypes) > 0 and data.apply_to_all_doctypes != 1:
 		remove_apply_to_all(data.user, data.doctype, data.docname)
 		update_applicable(perm_applied_docs, data.applicable_doctypes, data.user, data.doctype, data.docname)
-		for applicable in data.applicable_doctypes :
-			if applicable not in perm_applied_docs:
-				insert_user_perm(data.user, data.doctype, data.docname, data.is_default, data.hide_descendants, applicable=applicable)
-			elif exists:
+		for applicable in data.applicable_doctypes:
+			if applicable not in perm_applied_docs or exists:
 				insert_user_perm(data.user, data.doctype, data.docname, data.is_default, data.hide_descendants, applicable=applicable)
 		return 1
 	return 0

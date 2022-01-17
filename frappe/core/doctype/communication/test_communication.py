@@ -130,10 +130,9 @@ class TestCommunication(unittest.TestCase):
 
 		comm = frappe.get_doc("Communication", comm.name)
 
-		contact_links = []
-		for timeline_link in comm.timeline_links:
-			contact_links.append(timeline_link.link_name)
-
+		contact_links = [
+		    timeline_link.link_name for timeline_link in comm.timeline_links
+		]
 		self.assertIn(contact_sender.name, contact_links)
 		self.assertIn(contact_recipient.name, contact_links)
 		self.assertIn(contact_cc.name, contact_links)
@@ -169,10 +168,7 @@ class TestCommunication(unittest.TestCase):
 
 		comms = get_communication_data("Note", note.name, as_dict=True)
 
-		data = []
-		for comm in comms:
-			data.append(comm.name)
-
+		data = [comm.name for comm in comms]
 		self.assertIn(comm_note_1.name, data)
 		self.assertIn(comm_note_2.name, data)
 
@@ -195,10 +191,8 @@ class TestCommunication(unittest.TestCase):
 			"recipients": "comm_recipient+{0}+{1}@example.com".format(quote("Note"), quote(note.name)),
 		}).insert(ignore_permissions=True)
 
-		doc_links = []
-		for timeline_link in comm.timeline_links:
-			doc_links.append((timeline_link.link_doctype, timeline_link.link_name))
-
+		doc_links = [(timeline_link.link_doctype, timeline_link.link_name)
+		             for timeline_link in comm.timeline_links]
 		self.assertIn(("Note", note.name), doc_links)
 
 class TestCommunicationEmailMixin(unittest.TestCase):
@@ -207,7 +201,7 @@ class TestCommunicationEmailMixin(unittest.TestCase):
 		cc = ', '.join(cc or [])
 		bcc = ', '.join(bcc or [])
 
-		comm = frappe.get_doc({
+		return frappe.get_doc({
 			"doctype": "Communication",
 			"communication_type": "Communication",
 			"communication_medium": "Email",
@@ -216,7 +210,6 @@ class TestCommunicationEmailMixin(unittest.TestCase):
 			"cc": cc,
 			"bcc": bcc
 		}).insert(ignore_permissions=True)
-		return comm
 
 	def new_user(self, email, **user_data):
 		user_data.setdefault('first_name', 'first_name')
@@ -271,7 +264,7 @@ def create_email_account():
 	frappe.flags.mute_emails = False
 	frappe.flags.sent_mail = None
 
-	email_account = frappe.get_doc({
+	return frappe.get_doc({
 		"is_default": 1,
 		"is_global": 1,
 		"doctype": "Email Account",
@@ -295,5 +288,3 @@ def create_email_account():
 		"no_remaining":"0",
 		"enable_automatic_linking": 1
 	}).insert(ignore_permissions=True)
-
-	return email_account

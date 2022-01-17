@@ -75,9 +75,10 @@ class DataExporter:
 		self.column_start_end = {}
 
 		if self.all_doctypes:
-			self.child_doctypes = []
-			for df in frappe.get_meta(self.doctype).get_table_fields():
-				self.child_doctypes.append(dict(doctype=df.options, parentfield=df.fieldname))
+			self.child_doctypes = [
+			    dict(doctype=df.options, parentfield=df.fieldname)
+			    for df in frappe.get_meta(self.doctype).get_table_fields()
+			]
 
 	def build_response(self):
 		self.writer = UnicodeWriter()
@@ -289,7 +290,7 @@ class DataExporter:
 					sflags = self.docs_to_export.get("flags", "I,U").upper()
 					flags = 0
 					for a in re.split(r'\W+', sflags):
-						flags = flags | reflags.get(a,0)
+						flags |= reflags.get(a,0)
 
 					c = re.compile(names, flags)
 					m = c.match(doc.name)
@@ -351,13 +352,12 @@ class DataExporter:
 		filename = frappe.generate_hash("", 10)
 		with open(filename, 'wb') as f:
 			f.write(cstr(self.writer.getvalue()).encode('utf-8'))
-		f = open(filename)
-		reader = csv.reader(f)
+		with open(filename) as f:
+			reader = csv.reader(f)
 
-		from frappe.utils.xlsxutils import make_xlsx
-		xlsx_file = make_xlsx(reader, "Data Import Template" if self.template else 'Data Export')
+			from frappe.utils.xlsxutils import make_xlsx
+			xlsx_file = make_xlsx(reader, "Data Import Template" if self.template else 'Data Export')
 
-		f.close()
 		os.remove(filename)
 
 		# write out response as a xlsx type

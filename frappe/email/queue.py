@@ -78,10 +78,7 @@ def get_unsubscribe_message(unsubscribe_message, expose_recipients):
 			</div>
 		</div>""".format(unsubscribe_html)
 
-	if expose_recipients == "footer":
-		text = "\n<!--cc message-->"
-	else:
-		text = ""
+	text = "\n<!--cc message-->" if expose_recipients == "footer" else ""
 	text += "\n\n{unsubscribe_message}: <!--unsubscribe url-->\n".format(unsubscribe_message=unsubscribe_message)
 
 	return frappe._dict({

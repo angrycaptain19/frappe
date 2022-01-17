@@ -12,11 +12,11 @@ class DataMigrationMapping(Document):
 			return frappe.safe_eval(self.condition, get_safe_globals())
 
 	def get_fields(self):
-		fields = []
-		for f in self.fields:
-			if not (f.local_fieldname[0] in ('"', "'") or f.local_fieldname.startswith('eval:')):
-				fields.append(f.local_fieldname)
-
+		fields = [
+		    f.local_fieldname for f in self.fields
+		    if not (f.local_fieldname[0] in
+		            ('"', "'") or f.local_fieldname.startswith('eval:'))
+		]
 		if frappe.db.has_column(self.local_doctype, self.migration_id_field):
 			fields.append(self.migration_id_field)
 
@@ -52,27 +52,19 @@ class DataMigrationMapping(Document):
 		return mapped
 
 def get_mapped_child_records(mapping_name, child_docs):
-	mapped_child_docs = []
 	mapping = frappe.get_doc('Data Migration Mapping', mapping_name)
-	for child_doc in child_docs:
-		mapped_child_docs.append(mapping.get_mapped_record(child_doc))
-
-	return mapped_child_docs
+	return [mapping.get_mapped_record(child_doc) for child_doc in child_docs]
 
 def get_value_from_fieldname(field_map, fieldname_field, doc):
 	field_name = get_source_value(field_map, fieldname_field)
 
 	if field_name.startswith('eval:'):
-		value = frappe.safe_eval(field_name[5:], get_safe_globals())
+		return frappe.safe_eval(field_name[5:], get_safe_globals())
 	elif field_name[0] in ('"', "'"):
-		value = field_name[1:-1]
+		return field_name[1:-1]
 	else:
-		value = get_source_value(doc, field_name)
-	return value
+		return get_source_value(doc, field_name)
 
 def get_source_value(source, key):
 	'''Get value from source (object or dict) based on key'''
-	if isinstance(source, dict):
-		return source.get(key)
-	else:
-		return getattr(source, key)
+	return source.get(key) if isinstance(source, dict) else getattr(source, key)

@@ -22,11 +22,7 @@ def get_data(doctypes, last_modified):
 		dt = d.find("[") != -1 and d[:d.find("[")] or d
 		out[dt] = {}
 
-		if args.get("from"):
-			modified_table = "item."
-		else:
-			modified_table = ""
-
+		modified_table = "item." if args.get("from") else ""
 		conditions = order_by = ""
 		table = args.get("from") or ("`tab%s`" % dt)
 

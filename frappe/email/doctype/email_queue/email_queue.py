@@ -172,7 +172,7 @@ class SendMailContext:
 		self.log_exception(exc_type, exc_val, exc_tb)
 
 		if exc_type in exceptions:
-			email_status = (self.sent_to and 'Partially Sent') or 'Not Sent'
+			email_status = 'Partially Sent' if self.sent_to else 'Not Sent'
 			self.queue_doc.update_status(status = email_status, commit = True)
 		elif exc_type:
 			if self.queue_doc.retry < MAX_RETRY_COUNT:
@@ -184,12 +184,13 @@ class SendMailContext:
 			email_status = self.is_mail_sent_to_all() and 'Sent'
 			email_status = email_status or (self.sent_to and 'Partially Sent') or 'Not Sent'
 
-			update_fields = {'status': email_status}
-			if self.email_account_doc.is_exists_in_db():
-				update_fields['email_account'] = self.email_account_doc.name
-			else:
-				update_fields['email_account'] = None
-
+			update_fields = {
+			    'status':
+			    email_status,
+			    'email_account':
+			    self.email_account_doc.name
+			    if self.email_account_doc.is_exists_in_db() else None,
+			}
 			self.queue_doc.update_status(**update_fields, commit = True)
 
 	def log_exception(self, exc_type, exc_val, exc_tb):
@@ -248,12 +249,11 @@ class SendMailContext:
 		tracker_url_html = \
 			'<img src="https://{}/api/method/frappe.core.doctype.communication.email.mark_email_as_seen?name={}"/>'
 
-		message = ''
-		if frappe.conf.use_ssl and self.email_account_doc.track_email_status:
-			message = quopri.encodestring(
-				tracker_url_html.format(frappe.local.site, self.queue_doc.communication).encode()
-			).decode()
-		return message
+		return (quopri.encodestring(
+		    tracker_url_html.format(frappe.local.site,
+		                            self.queue_doc.communication).encode()).decode()
+		        if frappe.conf.use_ssl and self.email_account_doc.track_email_status
+		        else '')
 
 	def get_unsubscribe_str(self, recipient_email):
 		unsubscribe_url = ''
@@ -274,10 +274,7 @@ class SendMailContext:
 		return message
 
 	def get_receipient_str(self, recipient_email):
-		message = ''
-		if self.queue_doc.expose_recipients != "header":
-			message = recipient_email
-		return message
+		return recipient_email if self.queue_doc.expose_recipients != "header" else ''
 
 	def include_attachments(self, message):
 		message_obj = self.get_message_object(message)
@@ -316,7 +313,7 @@ class SendMailContext:
 @frappe.whitelist()
 def retry_sending(name):
 	doc = frappe.get_doc("Email Queue", name)
-	if doc and (doc.status == "Error" or doc.status == "Partially Errored"):
+	if doc and doc.status in ["Error", "Partially Errored"]:
 		doc.status = "Not Sent"
 		for d in doc.recipients:
 			if d.status != 'Sent':

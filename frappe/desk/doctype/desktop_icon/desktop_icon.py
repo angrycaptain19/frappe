@@ -53,7 +53,7 @@ def get_desktop_icons(user=None):
 
 		# update hidden property
 		for icon in user_icons:
-			standard_icon = standard_map.get(icon.module_name, None)
+			standard_icon = standard_map.get(icon.module_name)
 
 			if icon._doctype in blocked_doctypes:
 				icon.blocked = 1
@@ -179,13 +179,10 @@ def set_order(new_order, user=None):
 			else:
 				name = frappe.db.get_value('Desktop Icon',
 					{'standard': 1, 'module_name': module_name})
-				if name:
-					icon = frappe.get_doc('Desktop Icon', name)
-				else:
+				if not name:
 					# standard icon missing, create one for DocType
 					name = add_user_icon(module_name, standard=1)
-					icon = frappe.get_doc('Desktop Icon', name)
-
+				icon = frappe.get_doc('Desktop Icon', name)
 			icon.db_set('idx', i)
 
 	clear_desktop_icons_cache()
@@ -208,17 +205,15 @@ def set_desktop_icons(visible_list, ignore_duplicate=True):
 		name = frappe.db.get_value('Desktop Icon', {'module_name': module_name})
 		if name:
 			frappe.db.set_value('Desktop Icon', name, 'hidden', 0)
-		else:
-			if frappe.db.exists('DocType', module_name):
-				try:
-					add_user_icon(module_name, standard=1)
-				except frappe.UniqueValidationError as e:
-					if not ignore_duplicate:
-						raise e
-					else:
-						visible_list.remove(module_name)
-						if frappe.message_log:
-							frappe.message_log.pop()
+		elif frappe.db.exists('DocType', module_name):
+			try:
+				add_user_icon(module_name, standard=1)
+			except frappe.UniqueValidationError as e:
+				if not ignore_duplicate:
+					raise e
+				visible_list.remove(module_name)
+				if frappe.message_log:
+					frappe.message_log.pop()
 
 	# set the order
 	set_order(visible_list)

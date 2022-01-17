@@ -26,9 +26,9 @@ class SystemSettings(Document):
 					frappe.throw(_("Session Expiry must be in format {0}").format("hh:mm"))
 
 		if self.enable_two_factor_auth:
-			if self.two_factor_method=='SMS':
-				if not frappe.db.get_value('SMS Settings', None, 'sms_gateway_url'):
-					frappe.throw(_('Please setup SMS before setting it as an authentication method, via SMS Settings'))
+			if self.two_factor_method == 'SMS' and not frappe.db.get_value(
+			    'SMS Settings', None, 'sms_gateway_url'):
+				frappe.throw(_('Please setup SMS before setting it as an authentication method, via SMS Settings'))
 			toggle_two_factor_auth(True, roles=['All'])
 		else:
 			self.bypass_2fa_for_retricted_ip_users = 0
@@ -63,15 +63,15 @@ def update_last_reset_password_date():
 
 @frappe.whitelist()
 def load():
-	if not "System Manager" in frappe.get_roles():
+	if "System Manager" not in frappe.get_roles():
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
 	all_defaults = frappe.db.get_defaults()
-	defaults = {}
-
-	for df in frappe.get_meta("System Settings").get("fields"):
-		if df.fieldtype in ("Select", "Data"):
-			defaults[df.fieldname] = all_defaults.get(df.fieldname)
+	defaults = {
+	    df.fieldname: all_defaults.get(df.fieldname)
+	    for df in frappe.get_meta("System Settings").get("fields")
+	    if df.fieldtype in ("Select", "Data")
+	}
 
 	return {
 		"timezones": get_all_timezones(),

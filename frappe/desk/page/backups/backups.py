@@ -51,7 +51,7 @@ def cleanup_old_backups(site_path, files, limit):
 	backup_paths = sorted(backup_paths, key=os.path.getctime)
 	files_to_delete = len(backup_paths) - limit
 
-	for idx in range(0, files_to_delete):
+	for idx in range(files_to_delete):
 		f = os.path.basename(backup_paths[idx])
 		files.remove(f)
 

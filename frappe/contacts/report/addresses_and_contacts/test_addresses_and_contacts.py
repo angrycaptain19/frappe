@@ -38,11 +38,10 @@ def get_custom_linked_doctype():
 
 def get_custom_doc_for_address_and_contacts():
 	get_custom_linked_doctype()
-	linked_doc = frappe.get_doc({
+	return frappe.get_doc({
 		"doctype": "Test Custom Doctype",
 		"test_field": "Hello",
 	}).insert()
-	return linked_doc
 
 def create_linked_address(link_list):
 	if frappe.flags.test_address_created:

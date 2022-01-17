@@ -103,9 +103,8 @@ class EmailServer:
 			if self.is_temporary_system_problem(e):
 				return False
 
-			else:
-				frappe.msgprint(_('Invalid User Name or Support Password. Please rectify and try again.'))
-				raise
+			frappe.msgprint(_('Invalid User Name or Support Password. Please rectify and try again.'))
+			raise
 
 	def select_imap_folder(self, folder):
 		self.imap.select(folder)
@@ -141,7 +140,7 @@ class EmailServer:
 			num = num_copy = len(email_list)
 
 			# WARNING: Hard coded max no. of messages to be popped
-			if num > 50: num = 50
+			num = min(num, 50)
 
 			# size limits
 			self.total_size = 0
@@ -156,15 +155,12 @@ class EmailServer:
 			# WARNING: Mark as read - message number 101 onwards from the pop list
 			# This is to avoid having too many messages entering the system
 			num = num_copy
-			if not cint(self.settings.use_imap):
-				if num > 100 and not self.errors:
-					for m in range(101, num+1):
-						self.pop.dele(m)
+			if not cint(self.settings.use_imap) and num > 100 and not self.errors:
+				for m in range(101, num+1):
+					self.pop.dele(m)
 
 		except Exception as e:
-			if self.has_login_limit_exceeded(e):
-				pass
-			else:
+			if not self.has_login_limit_exceeded(e):
 				raise
 
 		out = { "latest_messages": self.latest_messages }
@@ -179,20 +175,16 @@ class EmailServer:
 
 	def get_new_mails(self, folder):
 		"""Return list of new mails"""
-		if cint(self.settings.use_imap):
-			email_list = []
-			self.check_imap_uidvalidity(folder)
+		if not cint(self.settings.use_imap):
+			return self.pop.list()[1]
 
-			readonly = False if self.settings.email_sync_rule == "UNSEEN" else True
+		self.check_imap_uidvalidity(folder)
 
-			self.imap.select(folder, readonly=readonly)
-			response, message = self.imap.uid('search', None, self.settings.email_sync_rule)
-			if message[0]:
-				email_list =  message[0].split()
-		else:
-			email_list = self.pop.list()[1]
+		readonly = self.settings.email_sync_rule != "UNSEEN"
 
-		return email_list
+		self.imap.select(folder, readonly=readonly)
+		response, message = self.imap.uid('search', None, self.settings.email_sync_rule)
+		return message[0].split() if message[0] else []
 
 	def check_imap_uidvalidity(self, folder):
 		# compare the UIDVALIDITY of email account and imap server
@@ -204,51 +196,46 @@ class EmailServer:
 		uidnext = int(self.parse_imap_response("UIDNEXT", message[0]) or "1")
 		frappe.db.set_value("Email Account", self.settings.email_account, "uidnext", uidnext)
 
-		if not uid_validity or uid_validity != current_uid_validity:
-			# uidvalidity changed & all email uids are reindexed by server
-			Communication = frappe.qb.DocType("Communication")
-			frappe.qb.update(Communication) \
-				.set(Communication.uid, -1) \
-				.where(Communication.communication_medium == "Email") \
-				.where(Communication.email_account == self.settings.email_account).run()
-
-			if self.settings.use_imap:
-				# new update for the IMAP Folder DocType
-				IMAPFolder = frappe.qb.DocType("IMAP Folder")
-				frappe.qb.update(IMAPFolder) \
-					.set(IMAPFolder.uidvalidity, current_uid_validity) \
-					.set(IMAPFolder.uidnext, uidnext) \
-					.where(IMAPFolder.parent == self.settings.email_account_name) \
-					.where(IMAPFolder.folder_name == folder).run()
-			else:
-				EmailAccount = frappe.qb.DocType("Email Account")
-				frappe.qb.update(EmailAccount) \
-					.set(EmailAccount.uidvalidity, current_uid_validity) \
-					.set(EmailAccount.uidnext, uidnext) \
-					.where(EmailAccount.name == self.settings.email_account_name).run()
-
-			# uid validity not found pulling emails for first time
-			if not uid_validity:
-				self.settings.email_sync_rule = "UNSEEN"
-				return
-
-			sync_count = 100 if uid_validity else int(self.settings.initial_sync_count)
-			from_uid = 1 if uidnext < (sync_count + 1) or (uidnext - sync_count) < 1 else uidnext - sync_count
-			# sync last 100 email
-			self.settings.email_sync_rule = "UID {}:{}".format(from_uid, uidnext)
-			self.uid_reindexed = True
-
-		elif uid_validity == current_uid_validity:
+		if uid_validity and uid_validity == current_uid_validity:
 			return
+		# uidvalidity changed & all email uids are reindexed by server
+		Communication = frappe.qb.DocType("Communication")
+		frappe.qb.update(Communication) \
+			.set(Communication.uid, -1) \
+			.where(Communication.communication_medium == "Email") \
+			.where(Communication.email_account == self.settings.email_account).run()
+
+		if self.settings.use_imap:
+			# new update for the IMAP Folder DocType
+			IMAPFolder = frappe.qb.DocType("IMAP Folder")
+			frappe.qb.update(IMAPFolder) \
+				.set(IMAPFolder.uidvalidity, current_uid_validity) \
+				.set(IMAPFolder.uidnext, uidnext) \
+				.where(IMAPFolder.parent == self.settings.email_account_name) \
+				.where(IMAPFolder.folder_name == folder).run()
+		else:
+			EmailAccount = frappe.qb.DocType("Email Account")
+			frappe.qb.update(EmailAccount) \
+				.set(EmailAccount.uidvalidity, current_uid_validity) \
+				.set(EmailAccount.uidnext, uidnext) \
+				.where(EmailAccount.name == self.settings.email_account_name).run()
+
+		# uid validity not found pulling emails for first time
+		if not uid_validity:
+			self.settings.email_sync_rule = "UNSEEN"
+			return
+
+		sync_count = 100 if uid_validity else int(self.settings.initial_sync_count)
+		from_uid = 1 if uidnext < (sync_count + 1) or (uidnext - sync_count) < 1 else uidnext - sync_count
+		# sync last 100 email
+		self.settings.email_sync_rule = "UID {}:{}".format(from_uid, uidnext)
+		self.uid_reindexed = True
 
 	def parse_imap_response(self, cmd, response):
 		pattern = r"(?<={cmd} )[0-9]*".format(cmd=cmd)
 		match = re.search(pattern, response.decode('utf-8'), re.U | re.I)
 
-		if match:
-			return match.group(0)
-		else:
-			return None
+		return match.group(0) if match else None
 
 	def retrieve_message(self, message_meta, msg_num=None):
 		incoming_mail = None
@@ -282,17 +269,13 @@ class EmailServer:
 
 				if not cint(self.settings.use_imap):
 					self.pop.dele(msg_num)
-				else:
-					# mark as seen if email sync rule is UNSEEN (syncing only unseen mails)
-					if self.settings.email_sync_rule == "UNSEEN":
-						self.imap.uid('STORE', message_meta, '+FLAGS', '(\\SEEN)')
+				elif self.settings.email_sync_rule == "UNSEEN":
+					self.imap.uid('STORE', message_meta, '+FLAGS', '(\\SEEN)')
 		else:
 			if not cint(self.settings.use_imap):
 				self.pop.dele(msg_num)
-			else:
-				# mark as seen if email sync rule is UNSEEN (syncing only unseen mails)
-				if self.settings.email_sync_rule == "UNSEEN":
-					self.imap.uid('STORE', message_meta, '+FLAGS', '(\\SEEN)')
+			elif self.settings.email_sync_rule == "UNSEEN":
+				self.imap.uid('STORE', message_meta, '+FLAGS', '(\\SEEN)')
 
 	def get_email_seen_status(self, uid, flag_string):
 		""" parse the email FLAGS response """
@@ -318,10 +301,10 @@ class EmailServer:
 			"-ERR [SYS/TEMP] Temporary system problem. Please try again later.",
 			"Connection timed out",
 		)
-		for message in messages:
-			if message in strip(cstr(e)) or message in strip(cstr(getattr(e, 'strerror', ''))):
-				return True
-		return False
+		return any(
+		    message in strip(cstr(e))
+		    or message in strip(cstr(getattr(e, 'strerror', '')))
+		    for message in messages)
 
 	def validate_message_limits(self, message_meta):
 		# throttle based on email size
@@ -331,12 +314,11 @@ class EmailServer:
 		m, size = message_meta.split()
 		size = cint(size)
 
-		if size < self.max_email_size:
-			self.total_size += size
-			if self.total_size > self.max_total_size:
-				raise TotalSizeExceededError
-		else:
+		if size >= self.max_email_size:
 			raise EmailSizeExceededError
+		self.total_size += size
+		if self.total_size > self.max_total_size:
+			raise TotalSizeExceededError
 
 	def make_error_msg(self, msg_num, incoming_mail):
 		error_msg = "Error in retrieving email."
@@ -445,13 +427,10 @@ class Email:
 
 	def decode_email(self, email):
 		if not email: return
-		decoded = ""
-		for part, encoding in decode_header(frappe.as_unicode(email).replace("\""," ").replace("\'"," ")):
-			if encoding:
-				decoded += part.decode(encoding)
-			else:
-				decoded += safe_decode(part)
-		return decoded
+		return "".join(
+		    part.decode(encoding) if encoding else safe_decode(part)
+		    for part, encoding in decode_header(
+		        frappe.as_unicode(email).replace("\"", " ").replace("\'", " ")))
 
 	def set_content_and_type(self):
 		self.content, self.content_type = '[Blank Email]', 'text/plain'
@@ -844,7 +823,7 @@ class InboundMail(Email):
 		"""
 		users = frappe.get_all("User Email", filters={"email_account": email_account.name},
 			fields=["parent"])
-		return list(set([user.get("parent") for user in users]))
+		return list({user.get("parent") for user in users})
 
 	@staticmethod
 	def clean_subject(subject):

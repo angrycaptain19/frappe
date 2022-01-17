@@ -60,10 +60,10 @@ class AutoEmailReport(Document):
 		# Check if all Mandatory Report Filters are filled by the User
 		filters = frappe.parse_json(self.filters) if self.filters else {}
 		filter_meta = frappe.parse_json(self.filter_meta) if self.filter_meta else {}
-		throw_list = []
-		for meta in filter_meta:
-			if meta.get("reqd") and not filters.get(meta["fieldname"]):
-				throw_list.append(meta['label'])
+		throw_list = [
+		    meta['label'] for meta in filter_meta
+		    if meta.get("reqd") and not filters.get(meta["fieldname"])
+		]
 		if throw_list:
 			frappe.throw(
 				title= _('Missing Filters Required'),
@@ -165,12 +165,8 @@ class AutoEmailReport(Document):
 			return
 
 		attachments = None
-		if self.format == "HTML":
-			message = data
-		else:
-			message = self.get_html_table()
-
-		if not self.format=='HTML':
+		message = data if self.format == "HTML" else self.get_html_table()
+		if self.format != 'HTML':
 			attachments = [{
 				'fname': self.get_file_name(),
 				'fcontent': data
@@ -221,12 +217,12 @@ def send_daily():
 		auto_email_report = frappe.get_doc('Auto Email Report', report.name)
 
 		# if not correct weekday, skip
-		if auto_email_report.frequency == "Weekdays":
-			if current_day in ("Saturday", "Sunday"):
-				continue
-		elif auto_email_report.frequency == 'Weekly':
-			if auto_email_report.day_of_week != current_day:
-				continue
+		if (auto_email_report.frequency == "Weekdays"
+		    and current_day in ("Saturday", "Sunday")
+		    or auto_email_report.frequency != "Weekdays"
+		    and auto_email_report.frequency == 'Weekly'
+		    and auto_email_report.day_of_week != current_day):
+			continue
 		try:
 			auto_email_report.send()
 		except Exception as e:

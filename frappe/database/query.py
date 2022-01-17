@@ -172,7 +172,7 @@ class Query:
 		"""
 		if kwargs.get("orderby"):
 			orderby = kwargs.get("orderby")
-			order = kwargs.get("order") if kwargs.get("order") else Order.desc
+			order = kwargs.get("order") or Order.desc
 			if isinstance(orderby, str) and len(orderby.split()) > 1:
 				orderby, order = change_orderby(orderby)
 			conditions = conditions.orderby(orderby, order=order)
@@ -263,19 +263,17 @@ class Query:
 		Returns:
 			frappe.qb: frappe.qb conditions object
 		"""
-		if isinstance(filters, int) or isinstance(filters, str):
+		if isinstance(filters, (int, str)):
 			filters = {"name": str(filters)}
 
 		if isinstance(filters, Criterion):
-			criterion = self.criterion_query(table, filters, **kwargs)
+			return self.criterion_query(table, filters, **kwargs)
 
 		elif isinstance(filters, (list, tuple)):
-			criterion = self.misc_query(table, filters, **kwargs)
+			return self.misc_query(table, filters, **kwargs)
 
 		else:
-			criterion = self.dict_query(filters=filters, table=table, **kwargs)
-
-		return criterion
+			return self.dict_query(filters=filters, table=table, **kwargs)
 
 	def get_sql(
 		self,
@@ -285,16 +283,8 @@ class Query:
 		**kwargs
 	):
 		criterion = self.build_conditions(table, filters, **kwargs)
-		if isinstance(fields, (list, tuple)):
-			query = criterion.select(*kwargs.get("field_objects", fields))
-
-		elif isinstance(fields, Criterion):
-			query = criterion.select(fields)
-
-		else:
-			query = criterion.select(fields)
-
-		return query
+		return (criterion.select(*kwargs.get("field_objects", fields)) if isinstance(
+		    fields, (list, tuple)) else criterion.select(fields))
 
 
 class Permission:

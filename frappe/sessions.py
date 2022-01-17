@@ -212,18 +212,13 @@ class Session:
 		if resume:
 			self.resume()
 
-		else:
-			if self.user:
-				self.start()
+		elif self.user:
+			self.start()
 
 	def start(self):
 		"""start a new session"""
 		# generate sid
-		if self.user=='Guest':
-			sid = 'Guest'
-		else:
-			sid = frappe.generate_hash()
-
+		sid = 'Guest' if self.user=='Guest' else frappe.generate_hash()
 		self.data.user = self.user
 		self.data.sid = sid
 		self.data.data.user = self.user
@@ -374,7 +369,7 @@ class Session:
 
 		# database persistence is secondary, don't update it too often
 		updated_in_db = False
-		if force or (time_diff==None) or (time_diff > 600):
+		if force or time_diff is None or time_diff > 600:
 			# update sessions table
 			frappe.db.sql("""update `tabSessions` set sessiondata=%s,
 				lastupdate=NOW() where sid=%s""" , (str(self.data['data']),
@@ -432,11 +427,7 @@ def get_geo_from_ip(ip_addr):
 			data   = reader.get(ip_addr)
 
 			return frappe._dict(data)
-	except ImportError:
-		return
-	except ValueError:
-		return
-	except TypeError:
+	except (ImportError, ValueError, TypeError):
 		return
 
 def get_geo_ip_country(ip_addr):

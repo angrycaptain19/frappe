@@ -86,8 +86,6 @@ def add_subscribers(name, email_list):
 				send_welcome_email(welcome_email, parsed_email, name)
 
 				count += 1
-			else:
-				pass
 		else:
 			frappe.msgprint(_("{0} is not a valid Email Address").format(email))
 

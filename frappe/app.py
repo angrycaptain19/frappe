@@ -262,9 +262,9 @@ def handle_exception(e):
 			indicator_color='red', width=640)
 		return_as_message = True
 
-	if e.__class__ == frappe.AuthenticationError:
-		if hasattr(frappe.local, "login_manager"):
-			frappe.local.login_manager.clear_cookies()
+	if e.__class__ == frappe.AuthenticationError and hasattr(
+	    frappe.local, "login_manager"):
+		frappe.local.login_manager.clear_cookies()
 
 	if http_status_code >= 500:
 		make_error_snapshot(e)
@@ -275,10 +275,11 @@ def handle_exception(e):
 	return response
 
 def after_request(rollback):
-	if (frappe.local.request.method in ("POST", "PUT") or frappe.local.flags.commit) and frappe.db:
-		if frappe.db.transaction_writes:
-			frappe.db.commit()
-			rollback = False
+	if ((frappe.local.request.method in ("POST", "PUT")
+	     or frappe.local.flags.commit) and frappe.db
+	    and frappe.db.transaction_writes):
+		frappe.db.commit()
+		rollback = False
 
 	# update session
 	if getattr(frappe.local, "session_obj", None):

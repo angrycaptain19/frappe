@@ -34,11 +34,7 @@ def publish_realtime(event=None, message=None, room=None,
 		message = {}
 
 	if event is None:
-		if getattr(frappe.local, "task_id", None):
-			event = "task_progress"
-		else:
-			event = "global"
-
+		event = "task_progress" if getattr(frappe.local, "task_id", None) else "global"
 	if event=='msgprint' and not user:
 		user = frappe.session.user
 
@@ -48,7 +44,7 @@ def publish_realtime(event=None, message=None, room=None,
 
 		if task_id:
 			room = get_task_progress_room(task_id)
-			if not "task_id" in message:
+			if "task_id" not in message:
 				message["task_id"] = task_id
 
 			after_commit = False
@@ -65,7 +61,7 @@ def publish_realtime(event=None, message=None, room=None,
 
 	if after_commit:
 		params = [event, message, room]
-		if not params in frappe.local.realtime_log:
+		if params not in frappe.local.realtime_log:
 			frappe.local.realtime_log.append(params)
 	else:
 		emit_via_redis(event, message, room)

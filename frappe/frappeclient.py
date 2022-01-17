@@ -241,10 +241,10 @@ class FrappeClient(object):
 		# build - attach children to parents
 		if tables:
 			docs = [frappe._dict(doc) for doc in docs]
-			docs_map = dict((doc.name, doc) for doc in docs)
+			docs_map = {doc.name: doc for doc in docs}
 
-			for fieldname in tables:
-				for child in tables[fieldname]:
+			for fieldname, value in tables.items():
+				for child in value:
 					child = frappe._dict(child)
 					if child.parent in docs_map:
 						docs_map[child.parent].setdefault(fieldname, []).append(child)
@@ -367,11 +367,8 @@ class OAuth2Session():
 	def __init__(self, headers):
 		self.headers = headers
 	def get(self, url, params, verify):
-		res = requests.get(url, params=params, headers=self.headers, verify=verify)
-		return res
+		return requests.get(url, params=params, headers=self.headers, verify=verify)
 	def post(self, url, data, verify):
-		res = requests.post(url, data=data, headers=self.headers, verify=verify)
-		return res
+		return requests.post(url, data=data, headers=self.headers, verify=verify)
 	def put(self, url, data, verify):
-		res = requests.put(url, data=data, headers=self.headers, verify=verify)
-		return res
+		return requests.put(url, data=data, headers=self.headers, verify=verify)

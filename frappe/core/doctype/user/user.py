@@ -183,12 +183,12 @@ class User(Document):
 
 	def set_system_user(self):
 		'''For the standard users like admin and guest, the user type is fixed.'''
-		user_type_mapper = {
-			'Administrator': 'System User',
-			'Guest': 'Website User'
-		}
-
 		if self.user_type and not frappe.get_cached_value('User Type', self.user_type, 'is_standard'):
+			user_type_mapper = {
+				'Administrator': 'System User',
+				'Guest': 'Website User'
+			}
+
 			if user_type_mapper.get(self.name):
 				self.user_type = user_type_mapper.get(self.name)
 			else:
@@ -254,7 +254,6 @@ class User(Document):
 
 		except frappe.OutgoingEmailError:
 			print(frappe.get_traceback())
-			pass # email server not set, don't send email
 
 	@Document.hook
 	def validate_reset_password(self):
@@ -304,10 +303,9 @@ class User(Document):
 	def send_welcome_mail_to_user(self):
 		from frappe.utils import get_url
 		link = self.reset_password()
-		subject = None
 		method = frappe.get_hooks("welcome_email")
-		if method:
-			subject = frappe.get_attr(method[-1])()
+		subject = frappe.get_attr(method[-1])() if method else None
+
 		if not subject:
 			site_name = frappe.db.get_default('site_name') or frappe.get_conf().get("site_name")
 			if site_name:
@@ -421,10 +419,9 @@ class User(Document):
 		tables = frappe.db.get_tables()
 		for tab in tables:
 			desc = frappe.db.get_table_columns_description(tab)
-			has_fields = []
-			for d in desc:
-				if d.get('name') in ['owner', 'modified_by']:
-					has_fields.append(d.get('name'))
+			has_fields = [
+			    d.get('name') for d in desc if d.get('name') in ['owner', 'modified_by']
+			]
 			for field in has_fields:
 				frappe.db.sql("""UPDATE `%s`
 					SET `%s` = %s
@@ -451,7 +448,7 @@ class User(Document):
 		self.save()
 
 	def remove_roles(self, *roles):
-		existing_roles = dict((d.role, d) for d in self.get("roles"))
+		existing_roles = {d.role: d for d in self.get("roles")}
 		for role in roles:
 			if role in existing_roles:
 				self.get("roles").remove(existing_roles[role])
@@ -460,7 +457,7 @@ class User(Document):
 
 	def remove_all_roles_for_guest(self):
 		if self.name == "Guest":
-			self.set("roles", list(set(d for d in self.get("roles") if d.role == "Guest")))
+			self.set("roles", list({d for d in self.get("roles") if d.role == "Guest"}))
 
 	def remove_disabled_roles(self):
 		disabled_roles = [d.name for d in frappe.get_all("Role", filters={"disabled":1})]
@@ -470,7 +467,7 @@ class User(Document):
 
 	def ensure_unique_roles(self):
 		exists = []
-		for i, d in enumerate(self.get("roles")):
+		for d in self.get("roles"):
 			if (not d.role) or (d.role in exists):
 				self.get("roles").remove(d)
 			else:
@@ -669,10 +666,7 @@ def update_password(new_password, logout_all_sessions=0, key=None, old_password=
 	frappe.db.set_value("User", user, "last_password_reset_date", today())
 	frappe.db.set_value("User", user, "reset_password_key", "")
 
-	if user_doc.user_type == "System User":
-		return "/app"
-	else:
-		return redirect_url if redirect_url else "/"
+	return "/app" if user_doc.user_type == "System User" else redirect_url or "/"
 
 @frappe.whitelist(allow_guest=True)
 def test_password_strength(new_password, key=None, old_password=None, user_data=None):
@@ -693,11 +687,8 @@ def test_password_strength(new_password, key=None, old_password=None, user_data=
 
 	if new_password:
 		result = _test_password_strength(new_password, user_inputs=user_data)
-		password_policy_validation_passed = False
-
-		# score should be greater than 0 and minimum_password_score
-		if result.get('score') and result.get('score') >= minimum_password_score:
-			password_policy_validation_passed = True
+		password_policy_validation_passed = bool(
+		    result.get('score') and result.get('score') >= minimum_password_score)
 
 		result['feedback']['password_policy_validation_passed'] = password_policy_validation_passed
 		return result
@@ -712,10 +703,9 @@ def get_email_awaiting(user):
 	waiting = frappe.get_all("User Email", fields=["email_account", "email_id"], filters={"awaiting_password": 1, "parent": user})
 	if waiting:
 		return waiting
-	else:
-		user_email_table = DocType("User Email")
-		frappe.qb.update(user_email_table).set(user_email_table.user_email_table, 0).where(user_email_table.parent == user).run()
-		return False
+	user_email_table = DocType("User Email")
+	frappe.qb.update(user_email_table).set(user_email_table.user_email_table, 0).where(user_email_table.parent == user).run()
+	return False
 
 def ask_pass_update():
 	# update the sys defaults as to awaiting users
@@ -760,41 +750,38 @@ def sign_up(email, full_name, redirect_to):
 
 	user = frappe.db.get("User", {"email": email})
 	if user:
-		if user.enabled:
-			return 0, _("Already Registered")
-		else:
-			return 0, _("Registered but disabled")
+		return ((0, _("Already Registered")) if user.enabled else
+		        (0, _("Registered but disabled")))
+	if frappe.db.get_creation_count('User', 60) > 300:
+		frappe.respond_as_web_page(_('Temporarily Disabled'),
+			_('Too many users signed up recently, so the registration is disabled. Please try back in an hour'),
+			http_status_code=429)
+
+	from frappe.utils import random_string
+	user = frappe.get_doc({
+		"doctype":"User",
+		"email": email,
+		"first_name": escape_html(full_name),
+		"enabled": 1,
+		"new_password": random_string(10),
+		"user_type": "Website User"
+	})
+	user.flags.ignore_permissions = True
+	user.flags.ignore_password_policy = True
+	user.insert()
+
+	# set default signup role as per Portal Settings
+	default_role = frappe.db.get_value("Portal Settings", None, "default_role")
+	if default_role:
+		user.add_roles(default_role)
+
+	if redirect_to:
+		frappe.cache().hset('redirect_after_login', user.name, redirect_to)
+
+	if user.flags.email_sent:
+		return 1, _("Please check your email for verification")
 	else:
-		if frappe.db.get_creation_count('User', 60) > 300:
-			frappe.respond_as_web_page(_('Temporarily Disabled'),
-				_('Too many users signed up recently, so the registration is disabled. Please try back in an hour'),
-				http_status_code=429)
-
-		from frappe.utils import random_string
-		user = frappe.get_doc({
-			"doctype":"User",
-			"email": email,
-			"first_name": escape_html(full_name),
-			"enabled": 1,
-			"new_password": random_string(10),
-			"user_type": "Website User"
-		})
-		user.flags.ignore_permissions = True
-		user.flags.ignore_password_policy = True
-		user.insert()
-
-		# set default signup role as per Portal Settings
-		default_role = frappe.db.get_value("Portal Settings", None, "default_role")
-		if default_role:
-			user.add_roles(default_role)
-
-		if redirect_to:
-			frappe.cache().hset('redirect_after_login', user.name, redirect_to)
-
-		if user.flags.email_sent:
-			return 1, _("Please check your email for verification")
-		else:
-			return 2, _("Please ask your administrator to verify your sign-up")
+		return 2, _("Please ask your administrator to verify your sign-up")
 
 @frappe.whitelist(allow_guest=True)
 @rate_limit(limit=get_password_reset_limit, seconds = 24*60*60, methods=['POST'])
@@ -868,18 +855,17 @@ def get_system_users(exclude_users=None, limit=None):
 	elif not isinstance(exclude_users, (list, tuple)):
 		exclude_users = [exclude_users]
 
-	limit_cond = ''
-	if limit:
-		limit_cond = 'limit {0}'.format(limit)
+	limit_cond = 'limit {0}'.format(limit) if limit else ''
 
 	exclude_users += list(STANDARD_USERS)
 
-	system_users = frappe.db.sql_list("""select name from `tabUser`
+	return frappe.db.sql_list(
+	    """select name from `tabUser`
 		where enabled=1 and user_type != 'Website User'
-		and name not in ({}) {}""".format(", ".join(["%s"]*len(exclude_users)), limit_cond),
-		exclude_users)
-
-	return system_users
+		and name not in ({}) {}"""
+	    .format(", ".join(["%s"] * len(exclude_users)), limit_cond),
+	    exclude_users,
+	)
 
 def get_active_users():
 	"""Returns No. of system users who logged in, in the last 3 days"""
@@ -1005,23 +991,23 @@ def create_contact(user, ignore_links=False, ignore_mandatory=False):
 		contact.gender = user.gender
 
 		# Add mobile number if phone does not exists in contact
-		if user.phone and not any(new_contact.phone == user.phone for new_contact in contact.phone_nos):
+		if user.phone and all(new_contact.phone != user.phone
+		                      for new_contact in contact.phone_nos):
 			# Set primary phone if there is no primary phone number
 			contact.add_phone(
-				user.phone,
-				is_primary_phone=not any(
-					new_contact.is_primary_phone == 1 for new_contact in contact.phone_nos
-				)
+			    user.phone,
+			    is_primary_phone=all(new_contact.is_primary_phone != 1
+			                         for new_contact in contact.phone_nos),
 			)
 
 		# Add mobile number if mobile does not exists in contact
-		if user.mobile_no and not any(new_contact.phone == user.mobile_no for new_contact in contact.phone_nos):
+		if user.mobile_no and all(new_contact.phone != user.mobile_no
+		                          for new_contact in contact.phone_nos):
 			# Set primary mobile if there is no primary mobile number
 			contact.add_phone(
-				user.mobile_no,
-				is_primary_mobile_no=not any(
-					new_contact.is_primary_mobile_no == 1 for new_contact in contact.phone_nos
-				)
+			    user.mobile_no,
+			    is_primary_mobile_no=all(new_contact.is_primary_mobile_no != 1
+			                             for new_contact in contact.phone_nos),
 			)
 
 		contact.save(ignore_permissions=True)
@@ -1053,7 +1039,6 @@ def switch_theme(theme):
 
 def get_enabled_users():
 	def _get_enabled_users():
-		enabled_users = frappe.get_all("User", filters={"enabled": "1"}, pluck="name")
-		return enabled_users
+		return frappe.get_all("User", filters={"enabled": "1"}, pluck="name")
 
 	return frappe.cache().get_value("enabled_users", _get_enabled_users)

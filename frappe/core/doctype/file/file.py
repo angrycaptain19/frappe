@@ -220,29 +220,30 @@ class File(Document):
 			frappe.throw(_("File {0} does not exist").format(self.file_url), IOError)
 
 	def validate_duplicate_entry(self):
-		if not self.flags.ignore_duplicate_entry_error and not self.is_folder:
-			if not self.content_hash:
-				self.generate_content_hash()
+		if self.flags.ignore_duplicate_entry_error or self.is_folder:
+			return
+		if not self.content_hash:
+			self.generate_content_hash()
 
-			# check duplicate name
-			# check duplicate assignment
-			filters = {
-				'content_hash': self.content_hash,
-				'is_private': self.is_private,
-				'name': ('!=', self.name)
-			}
-			if self.attached_to_doctype and self.attached_to_name:
-				filters.update({
-					'attached_to_doctype': self.attached_to_doctype,
-					'attached_to_name': self.attached_to_name
-				})
-			duplicate_file = frappe.db.get_value('File', filters, ['name', 'file_url'], as_dict=1)
+		# check duplicate name
+		# check duplicate assignment
+		filters = {
+			'content_hash': self.content_hash,
+			'is_private': self.is_private,
+			'name': ('!=', self.name)
+		}
+		if self.attached_to_doctype and self.attached_to_name:
+			filters.update({
+				'attached_to_doctype': self.attached_to_doctype,
+				'attached_to_name': self.attached_to_name
+			})
+		duplicate_file = frappe.db.get_value('File', filters, ['name', 'file_url'], as_dict=1)
 
-			if duplicate_file:
-				duplicate_file_doc = frappe.get_cached_doc('File', duplicate_file.name)
-				if duplicate_file_doc.exists_on_disk():
-						# just use the url, to avoid uploading a duplicate
-						self.file_url = duplicate_file.file_url
+		if duplicate_file:
+			duplicate_file_doc = frappe.get_cached_doc('File', duplicate_file.name)
+			if duplicate_file_doc.exists_on_disk():
+					# just use the url, to avoid uploading a duplicate
+					self.file_url = duplicate_file.file_url
 
 	def set_file_name(self):
 		if not self.file_name and self.file_url:
@@ -360,8 +361,7 @@ class File(Document):
 
 
 	def exists_on_disk(self):
-		exists = os.path.exists(self.get_full_path())
-		return exists
+		return os.path.exists(self.get_full_path())
 
 
 	def get_content(self):
@@ -516,11 +516,9 @@ class File(Document):
 
 	def delete_file_from_filesystem(self, only_thumbnail=False):
 		"""Delete file, thumbnail from File document"""
-		if only_thumbnail:
-			delete_file(self.thumbnail_url)
-		else:
+		if not only_thumbnail:
 			delete_file(self.file_url)
-			delete_file(self.thumbnail_url)
+		delete_file(self.thumbnail_url)
 
 	def is_downloadable(self):
 		return has_permission(self, 'read')
@@ -729,20 +727,21 @@ def get_web_image(file_url):
 
 def delete_file(path):
 	"""Delete file from `public folder`"""
-	if path:
-		if ".." in path.split("/"):
-			frappe.msgprint(_("It is risky to delete this file: {0}. Please contact your System Manager.").format(path))
+	if not path:
+		return
+	if ".." in path.split("/"):
+		frappe.msgprint(_("It is risky to delete this file: {0}. Please contact your System Manager.").format(path))
 
-		parts = os.path.split(path.strip("/"))
-		if parts[0]=="files":
-			path = frappe.utils.get_site_path("public", "files", parts[-1])
+	parts = os.path.split(path.strip("/"))
+	if parts[0]=="files":
+		path = frappe.utils.get_site_path("public", "files", parts[-1])
 
-		else:
-			path = frappe.utils.get_site_path("private", "files", parts[-1])
+	else:
+		path = frappe.utils.get_site_path("private", "files", parts[-1])
 
-		path = encode(path)
-		if os.path.exists(path):
-			os.remove(path)
+	path = encode(path)
+	if os.path.exists(path):
+		os.remove(path)
 
 
 @frappe.whitelist()
@@ -809,10 +808,7 @@ def get_file_name(fname, optional_suffix):
 	fname = cstr(fname)
 
 	f = fname.rsplit('.', 1)
-	if len(f) == 1:
-		partial, extn = f[0], ""
-	else:
-		partial, extn = f[0], "." + f[1]
+	partial, extn = (f[0], "") if len(f) == 1 else (f[0], "." + f[1])
 	return '{partial}{suffix}{extn}'.format(partial=partial, extn=extn, suffix=optional_suffix)
 
 
@@ -890,9 +886,7 @@ def extract_images_from_html(doc, content, is_private=False):
 
 
 def get_random_filename(content_type=None):
-	extn = None
-	if content_type:
-		extn = mimetypes.guess_extension(content_type)
+	extn = mimetypes.guess_extension(content_type) if content_type else None
 
 	return random_string(7) + (extn or "")
 
@@ -901,8 +895,7 @@ def get_random_filename(content_type=None):
 def unzip_file(name):
 	'''Unzip the given file and make file records for each of the extracted files'''
 	file_obj = frappe.get_doc('File', name)
-	files = file_obj.unzip()
-	return files
+	return file_obj.unzip()
 
 
 @frappe.whitelist()

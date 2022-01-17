@@ -44,10 +44,11 @@ def make(doctype=None, name=None, content=None, subject=None, sent_or_received =
 	is_error_report = (doctype=="User" and name==frappe.session.user and subject=="Error Report")
 	send_me_a_copy = cint(send_me_a_copy)
 
-	if not ignore_permissions:
-		if doctype and name and not is_error_report and not frappe.has_permission(doctype, "email", name) and not (flags or {}).get('ignore_doctype_permissions'):
-			raise frappe.PermissionError("You are not allowed to send emails related to: {doctype} {name}".format(
-				doctype=doctype, name=name))
+	if (not ignore_permissions and doctype and name and not is_error_report
+	    and not frappe.has_permission(doctype, "email", name)
+	    and not (flags or {}).get('ignore_doctype_permissions')):
+		raise frappe.PermissionError("You are not allowed to send emails related to: {doctype} {name}".format(
+			doctype=doctype, name=name))
 
 	if not sender:
 		sender = get_formatted_email(frappe.session.user)
@@ -100,7 +101,8 @@ def make(doctype=None, name=None, content=None, subject=None, sent_or_received =
 
 def validate_email(doc):
 	"""Validate Email Addresses of Recipients and CC"""
-	if not (doc.communication_type=="Communication" and doc.communication_medium == "Email") or doc.flags.in_receive:
+	if (doc.communication_type != "Communication"
+	    or doc.communication_medium != "Email" or doc.flags.in_receive):
 		return
 
 	# validate recipients

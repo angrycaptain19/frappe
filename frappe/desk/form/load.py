@@ -24,9 +24,6 @@ def getdoc(doctype, name, user=None):
 	if not (doctype and name):
 		raise Exception('doctype and name required!')
 
-	if not name:
-		name = doctype
-
 	if not frappe.db.exists(doctype, name):
 		return []
 
@@ -283,21 +280,24 @@ def get_communication_data(doctype, name, start=0, limit=20, after=None, fields=
 		{conditions}
 	'''.format(fields=fields, conditions=conditions)
 
-	communications = frappe.db.sql('''
+	return frappe.db.sql(
+	    '''
 		SELECT *
 		FROM (({part1}) UNION ({part2})) AS combined
 		{group_by}
 		ORDER BY creation DESC
 		LIMIT %(limit)s
 		OFFSET %(start)s
-	'''.format(part1=part1, part2=part2, group_by=(group_by or '')), dict(
-		doctype=doctype,
-		name=name,
-		start=frappe.utils.cint(start),
-		limit=limit
-	), as_dict=as_dict)
-
-	return communications
+	'''
+	    .format(part1=part1, part2=part2, group_by=(group_by or '')),
+	    dict(
+	        doctype=doctype,
+	        name=name,
+	        start=frappe.utils.cint(start),
+	        limit=limit,
+	    ),
+	    as_dict=as_dict,
+	)
 
 def get_assignments(dt, dn):
 	return frappe.get_all("ToDo",
@@ -313,11 +313,10 @@ def get_badge_info(doctypes, filters):
 	filters = json.loads(filters)
 	doctypes = json.loads(doctypes)
 	filters["docstatus"] = ["!=", 2]
-	out = {}
-	for doctype in doctypes:
-		out[doctype] = frappe.db.get_value(doctype, filters, "count(*)")
-
-	return out
+	return {
+	    doctype: frappe.db.get_value(doctype, filters, "count(*)")
+	    for doctype in doctypes
+	}
 
 def run_onload(doc):
 	doc.set("__onload", frappe._dict())

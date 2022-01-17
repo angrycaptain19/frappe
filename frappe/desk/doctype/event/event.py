@@ -43,24 +43,25 @@ class Event(Document):
 				frappe.delete_doc_if_exists("Communication", communication.name)
 
 	def sync_communication(self):
-		if self.event_participants:
-			for participant in self.event_participants:
-				filters = [
-					["Communication", "reference_doctype", "=", self.doctype],
-					["Communication", "reference_name", "=", self.name],
-					["Communication Link", "link_doctype", "=", participant.reference_doctype],
-					["Communication Link", "link_name", "=", participant.reference_docname]
-				]
-				comms = frappe.get_all("Communication", filters=filters, fields=["name"])
+		if not self.event_participants:
+			return
+		for participant in self.event_participants:
+			filters = [
+				["Communication", "reference_doctype", "=", self.doctype],
+				["Communication", "reference_name", "=", self.name],
+				["Communication Link", "link_doctype", "=", participant.reference_doctype],
+				["Communication Link", "link_name", "=", participant.reference_docname]
+			]
+			comms = frappe.get_all("Communication", filters=filters, fields=["name"])
 
-				if comms:
-					for comm in comms:
-						communication = frappe.get_doc("Communication", comm.name)
-						self.update_communication(participant, communication)
-				else:
-					meta = frappe.get_meta(participant.reference_doctype)
-					if hasattr(meta, "allow_events_in_timeline") and meta.allow_events_in_timeline==1:
-						self.create_communication(participant)
+			if comms:
+				for comm in comms:
+					communication = frappe.get_doc("Communication", comm.name)
+					self.update_communication(participant, communication)
+			else:
+				meta = frappe.get_meta(participant.reference_doctype)
+				if hasattr(meta, "allow_events_in_timeline") and meta.allow_events_in_timeline==1:
+					self.create_communication(participant)
 
 	def create_communication(self, participant):
 		communication = frappe.new_doc("Communication")
@@ -70,7 +71,7 @@ class Event(Document):
 	def update_communication(self, participant, communication):
 		communication.communication_medium = "Event"
 		communication.subject = self.subject
-		communication.content = self.description if self.description else self.subject
+		communication.content = self.description or self.subject
 		communication.communication_date = self.starts_on
 		communication.sender = self.owner
 		communication.sender_full_name = frappe.utils.get_fullname(self.owner)
@@ -135,10 +136,7 @@ def get_permission_query_conditions(user):
 		}
 
 def has_permission(doc, user):
-	if doc.event_type=="Public" or doc.owner==user:
-		return True
-
-	return False
+	return doc.event_type=="Public" or doc.owner==user
 
 def send_event_digest():
 	today = nowdate()

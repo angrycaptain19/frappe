@@ -2,7 +2,7 @@ import frappe
 from frappe.utils import get_fullname
 
 def get_leaderboards():
-	leaderboards = {
+	return {
 		'User': {
 			'fields': ['points'],
 			'method': 'frappe.desk.leaderboard.get_energy_point_leaderboard',
@@ -10,7 +10,6 @@ def get_leaderboards():
 			'icon': 'users'
 		}
 	}
-	return leaderboards
 
 @frappe.whitelist()
 def get_energy_point_leaderboard(date_range, company = None, field = None, limit = None):

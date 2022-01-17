@@ -25,8 +25,7 @@ def update(doctype, field, value, condition='', limit=500):
 	docnames = frappe.db.sql_list(
 		'''select name from `tab{0}`{1} limit {2} offset 0'''.format(doctype, condition, limit)
 	)
-	data = {}
-	data[field] = value
+	data = {field: value}
 	return submit_cancel_or_update_docs(doctype, docnames, 'update', data)
 
 @frappe.whitelist()

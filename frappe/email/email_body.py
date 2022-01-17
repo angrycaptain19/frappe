@@ -221,13 +221,22 @@ class EMail:
 	def make(self):
 		"""build into msg_root"""
 		headers = {
-			"Subject":        strip(self.subject),
-			"From":           self.sender,
-			"To":             ', '.join(self.recipients) if self.expose_recipients=="header" else "<!--recipient-->",
-			"Date":           email.utils.formatdate(),
-			"Reply-To":       self.reply_to if self.reply_to else None,
-			"CC":             ', '.join(self.cc) if self.cc and self.expose_recipients=="header" else None,
-			'X-Frappe-Site':  get_url(),
+		    "Subject":
+		    strip(self.subject),
+		    "From":
+		    self.sender,
+		    "To":
+		    ', '.join(self.recipients)
+		    if self.expose_recipients == "header" else "<!--recipient-->",
+		    "Date":
+		    email.utils.formatdate(),
+		    "Reply-To":
+		    self.reply_to or None,
+		    "CC":
+		    ', '.join(self.cc)
+		    if self.cc and self.expose_recipients == "header" else None,
+		    'X-Frappe-Site':
+		    get_url(),
 		}
 
 		# reset headers as values may be changed.
@@ -374,16 +383,13 @@ def get_footer(email_account, footer=None):
 	args = {}
 
 	if email_account and email_account.footer:
-		args.update({'email_account_footer': email_account.footer})
-
+		args['email_account_footer'] = email_account.footer
 	sender_address = frappe.db.get_default("email_footer_address")
 
 	if sender_address:
-		args.update({'sender_address': sender_address})
-
+		args['sender_address'] = sender_address
 	if not cint(frappe.db.get_default("disable_standard_email_footer")):
-		args.update({'default_mail_footer': frappe.get_hooks('default_mail_footer')})
-
+		args['default_mail_footer'] = frappe.get_hooks('default_mail_footer')
 	footer += frappe.utils.jinja.get_email_from_template('email_footer', args)[0]
 
 	return footer

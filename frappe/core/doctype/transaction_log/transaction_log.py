@@ -17,10 +17,7 @@ class TransactionLog(Document):
 		self.timestamp = now_datetime()
 		if index != 1:
 			prev_hash = frappe.get_all("Transaction Log", filters={"row_index":str(index-1)}, pluck="chaining_hash", limit=1)
-			if prev_hash:
-				self.previous_hash = prev_hash[0]
-			else:
-				self.previous_hash = "Indexing broken"
+			self.previous_hash = prev_hash[0] if prev_hash else "Indexing broken"
 		else:
 			self.previous_hash = self.hash_line()
 		self.transaction_hash = self.hash_line()

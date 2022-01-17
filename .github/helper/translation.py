@@ -29,10 +29,7 @@ for _file in files_to_scan:
 					if has_f_string:
 						errors_encounter += 1
 						print(f'\nF-strings are not supported for translations at line number {line_number}\n{line.strip()[:100]}')
-						continue
-					else:
-						continue
-
+					continue
 				match = pattern.search(line)
 				error_found = False
 

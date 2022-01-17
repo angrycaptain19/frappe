@@ -44,33 +44,33 @@ class MariaDBTable(DBTable):
 		for col in self.columns.values():
 			col.build_for_alter_table(self.current_columns.get(col.fieldname.lower()))
 
-		add_column_query = []
-		modify_column_query = []
-		add_index_query = []
-		drop_index_query = []
-
 		columns_to_modify =  set(self.change_type + self.add_unique + self.set_default)
 
-		for col in self.add_column:
-			add_column_query.append("ADD COLUMN `{}` {}".format(col.fieldname, col.get_definition()))
-
-		for col in columns_to_modify:
-			modify_column_query.append("MODIFY `{}` {}".format(col.fieldname, col.get_definition()))
-
-		for col in self.add_index:
-			# if index key not exists
-			if not frappe.db.sql("SHOW INDEX FROM `%s` WHERE key_name = %s" %
-					(self.table_name, '%s'), col.fieldname):
-				add_index_query.append("ADD INDEX `{}`(`{}`)".format(col.fieldname, col.fieldname))
-
-		for col in self.drop_index:
-			if col.fieldname != 'name': # primary key
-				# if index key exists
-				if frappe.db.sql("""SHOW INDEX FROM `{0}`
+		add_column_query = [
+		    "ADD COLUMN `{}` {}".format(col.fieldname, col.get_definition())
+		    for col in self.add_column
+		]
+		modify_column_query = [
+		    "MODIFY `{}` {}".format(col.fieldname, col.get_definition())
+		    for col in columns_to_modify
+		]
+		add_index_query = [
+		    "ADD INDEX `{}`(`{}`)".format(col.fieldname, col.fieldname)
+		    for col in self.add_index if not frappe.db.sql(
+		        "SHOW INDEX FROM `%s` WHERE key_name = %s" % (self.table_name, '%s'),
+		        col.fieldname,
+		    )
+		]
+		drop_index_query = [
+		    "drop index `{}`".format(col.fieldname) for col in self.drop_index
+		    if col.fieldname != 'name' and frappe.db.sql(
+		        """SHOW INDEX FROM `{0}`
 					WHERE key_name=%s
-					AND Non_unique=%s""".format(self.table_name), (col.fieldname, col.unique)):
-					drop_index_query.append("drop index `{}`".format(col.fieldname))
-
+					AND Non_unique=%s"""
+		        .format(self.table_name),
+		        (col.fieldname, col.unique),
+		    )
+		]
 		try:
 			for query_parts in [add_column_query, modify_column_query, add_index_query, drop_index_query]:
 				if query_parts:

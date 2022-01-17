@@ -128,9 +128,10 @@ def normalize_result(result, columns):
 	column_names = [column["fieldname"] for column in columns]
 	if result and isinstance(result[0], (list, tuple)):
 		for row in result:
-			row_obj = {}
-			for idx, column_name in enumerate(column_names):
-				row_obj[column_name] = row[idx]
+			row_obj = {
+			    column_name: row[idx]
+			    for idx, column_name in enumerate(column_names)
+			}
 			data.append(row_obj)
 	else:
 		data = result
@@ -383,7 +384,7 @@ def handle_duration_fieldtype_values(result, columns):
 			fieldtype = col.get("fieldtype")
 
 		if fieldtype == "Duration":
-			for entry in range(0, len(result)):
+			for entry in range(len(result)):
 				row = result[entry]
 				if isinstance(row, dict):
 					val_in_seconds = row[col.fieldname]
@@ -510,9 +511,7 @@ def get_data_for_custom_field(doctype, field):
 	if not frappe.has_permission(doctype, "read"):
 		frappe.throw(_("Not Permitted"), frappe.PermissionError)
 
-	value_map = frappe._dict(frappe.get_all(doctype, fields=["name", field], as_list=1))
-
-	return value_map
+	return frappe._dict(frappe.get_all(doctype, fields=["name", field], as_list=1))
 
 
 def get_data_for_custom_report(columns):
@@ -697,16 +696,15 @@ def get_linked_doctypes(columns, data):
 	# remove doctype if column is empty
 	columns_with_value = []
 	for row in data:
-		if row:
-			if len(row) != len(columns_with_value):
-				if isinstance(row, (list, tuple)):
-					row = enumerate(row)
-				elif isinstance(row, dict):
-					row = row.items()
+		if row and len(row) != len(columns_with_value):
+			if isinstance(row, (list, tuple)):
+				row = enumerate(row)
+			elif isinstance(row, dict):
+				row = row.items()
 
-				for col, val in row:
-					if val and col not in columns_with_value:
-						columns_with_value.append(col)
+			for col, val in row:
+				if val and col not in columns_with_value:
+					columns_with_value.append(col)
 
 	items = list(linked_doctypes.items())
 

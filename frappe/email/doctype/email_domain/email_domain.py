@@ -24,7 +24,7 @@ class EmailDomain(Document):
 		if frappe.local.flags.in_patch or frappe.local.flags.in_test:
 			return
 
-		if not frappe.local.flags.in_install and not frappe.local.flags.in_patch:
+		if not frappe.local.flags.in_install:
 			try:
 				if self.use_imap:
 					logger.info('Checking incoming IMAP email server {host}:{port} ssl={ssl}...'.format(

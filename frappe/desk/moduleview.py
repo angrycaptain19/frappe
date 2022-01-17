@@ -14,11 +14,9 @@ def get(module):
 	`/desk/#Module/[name]`."""
 	data = get_data(module)
 
-	out = {
+	return {
 		"data": data
 	}
-
-	return out
 
 @frappe.whitelist()
 def hide_module(module):
@@ -27,10 +25,7 @@ def hide_module(module):
 
 def get_table_with_counts():
 	counts = frappe.cache().get_value("information_schema:counts")
-	if counts:
-		return counts
-	else:
-		return build_table_count_cache()
+	return counts or build_table_count_cache()
 
 def get_data(module, build=True):
 	"""Get module data for the module view `desk/#Module/[name]`"""
@@ -223,7 +218,10 @@ def apply_permissions(data):
 
 def get_disabled_reports():
 	if not hasattr(frappe.local, "disabled_reports"):
-		frappe.local.disabled_reports = set(r.name for r in frappe.get_all("Report", {"disabled": 1}))
+		frappe.local.disabled_reports = {
+		    r.name
+		    for r in frappe.get_all("Report", {"disabled": 1})
+		}
 	return frappe.local.disabled_reports
 
 def get_config(app, module):
@@ -338,10 +336,7 @@ def get_desktop_settings():
 	def apply_user_saved_links(module):
 		module = frappe._dict(module)
 		all_links = get_links(module.app, module.module_name)
-		module_links_by_name = {}
-		for link in all_links:
-			module_links_by_name[link['name']] = link
-
+		module_links_by_name = {link['name']: link for link in all_links}
 		if module.module_name in user_saved_links_by_module:
 			user_links = frappe.parse_json(user_saved_links_by_module[module.module_name])
 			module.links = [module_links_by_name[l] for l in user_links if l in module_links_by_name]
@@ -524,7 +519,7 @@ def get_last_modified(doctype):
 				raise
 
 		# hack: save as -1 so that it is cached
-		if last_modified==None:
+		if last_modified is None:
 			last_modified = -1
 
 		return last_modified
@@ -542,14 +537,16 @@ def get_report_list(module, is_standard="No"):
 		{"is_standard": is_standard, "disabled": 0, "module": module},
 		order_by="name")
 
-	out = []
-	for r in reports:
-		out.append({
-			"type": "report",
-			"doctype": r.ref_doctype,
-			"is_query_report": 1 if r.report_type in ("Query Report", "Script Report", "Custom Report") else 0,
-			"label": _(r.name),
-			"name": r.name
-		})
-
-	return out
+	return [{
+	    "type":
+	    "report",
+	    "doctype":
+	    r.ref_doctype,
+	    "is_query_report":
+	    1 if r.report_type in ("Query Report", "Script Report",
+	                           "Custom Report") else 0,
+	    "label":
+	    _(r.name),
+	    "name":
+	    r.name,
+	} for r in reports]

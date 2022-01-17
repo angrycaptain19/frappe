@@ -105,8 +105,8 @@ def update_order(board_name, order):
 	order_dict = json.loads(order)
 
 	updated_cards = []
+	order_list = []
 	for col_name, cards in order_dict.items():
-		order_list = []
 		for card in cards:
 			column = frappe.get_value(
 				doctype,
@@ -194,9 +194,8 @@ def quick_kanban_board(doctype, board_name, field_name, project=None):
 		if field.fieldname == field_name:
 			options = field.options
 
-	columns = []
-	if options:
-		columns = options.split('\n')
+
+	columns = options.split('\n') if options else []
 
 	for column in columns:
 		if not column:
