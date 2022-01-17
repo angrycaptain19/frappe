@@ -99,9 +99,9 @@ class ParallelTestRunner():
 	def print_result(self):
 		self.test_result.printErrors()
 		click.echo(self.test_result)
-		if self.test_result.failures or self.test_result.errors:
-			if os.environ.get('CI'):
-				sys.exit(1)
+		if (self.test_result.failures
+		    or self.test_result.errors) and os.environ.get('CI'):
+			sys.exit(1)
 
 	def get_test_file_list(self):
 		test_list = get_all_tests(self.app)
@@ -251,8 +251,5 @@ class ParallelTestWithOrchestrator(ParallelTestRunner):
 		url = f'{self.orchestrator_url}/{endpoint}'
 		res = requests.get(url, json=data, headers=headers)
 		res.raise_for_status()
-		response_data = {}
-		if 'application/json' in res.headers.get('content-type'):
-			response_data = res.json()
-
-		return response_data
+		return (res.json()
+		        if 'application/json' in res.headers.get('content-type') else {})

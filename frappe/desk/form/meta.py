@@ -112,7 +112,7 @@ class FormMeta(Meta):
 	def add_html_templates(self, path):
 		if self.custom:
 			return
-		templates = dict()
+		templates = {}
 		for fname in os.listdir(path):
 			if fname.endswith(".html"):
 				with io.open(os.path.join(path, fname), 'r', encoding = 'utf-8') as f:
@@ -136,11 +136,11 @@ class FormMeta(Meta):
 		list_script = ''
 		form_script = ''
 		for script in client_scripts:
-			if script.view == 'List':
-				list_script += script.script
-
 			if script.view == 'Form':
 				form_script += script.script
+
+			elif script.view == 'List':
+				list_script += script.script
 
 		file = scrub(self.name)
 		form_script += f"\n\n//# sourceURL={file}__custom_js"
@@ -193,11 +193,11 @@ class FormMeta(Meta):
 		if not self.custom:
 			module = load_doctype_module(self.name)
 			app = module.__name__.split(".")[0]
-			templates = {}
 			if hasattr(module, "form_grid_templates"):
-				for key, path in module.form_grid_templates.items():
-					templates[key] = get_html_format(frappe.get_app_path(app, path))
-
+				templates = {
+				    key: get_html_format(frappe.get_app_path(app, path))
+				    for key, path in module.form_grid_templates.items()
+				}
 				self.set("__form_grid_templates", templates)
 
 	def set_translations(self, lang):

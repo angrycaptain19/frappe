@@ -57,8 +57,7 @@ def get_notifications_for_doctypes(config, notification_count):
 
 				except frappe.PermissionError:
 					frappe.clear_messages()
-					pass
-					# frappe.msgprint("Permission Error in notifications for {0}".format(d))
+									# frappe.msgprint("Permission Error in notifications for {0}".format(d))
 
 				except Exception as e:
 					# OperationalError: (1412, 'Table definition has changed, please retry transaction')
@@ -101,7 +100,6 @@ def get_notifications_for_targets(config, notification_percent):
 
 				except frappe.PermissionError:
 					frappe.clear_messages()
-					pass
 				except Exception as e:
 					if e.args[0] not in (1412, 1684):
 						raise
@@ -146,11 +144,7 @@ def clear_doctype_notifications(doc, method=None, *args, **kwargs):
 	config = get_notification_config()
 	if not config:
 		return
-	if isinstance(doc, str):
-		doctype = doc # assuming doctype name was passed directly
-	else:
-		doctype = doc.doctype
-
+	doctype = doc if isinstance(doc, str) else doc.doctype
 	if doctype in config.for_doctype:
 		delete_notification_count_for(doctype)
 		return
@@ -190,16 +184,13 @@ def get_notification_config():
 				nc = frappe.get_attr(notification_config)()
 				for key in ("for_doctype", "for_module", "for_other", "targets"):
 					config.setdefault(key, {})
-					if key == "for_doctype":
-						if len(subscribed_documents) > 0:
-							key_config = nc.get(key, {})
-							subscribed_docs_config = frappe._dict()
-							for document in subscribed_documents:
-								if key_config.get(document):
-									subscribed_docs_config[document] = key_config.get(document)
-							config[key].update(subscribed_docs_config)
-						else:
-							config[key].update(nc.get(key, {}))
+					if key == "for_doctype" and len(subscribed_documents) > 0:
+						key_config = nc.get(key, {})
+						subscribed_docs_config = frappe._dict()
+						for document in subscribed_documents:
+							if key_config.get(document):
+								subscribed_docs_config[document] = key_config.get(document)
+						config[key].update(subscribed_docs_config)
 					else:
 						config[key].update(nc.get(key, {}))
 		return config
@@ -210,9 +201,7 @@ def get_filters_for(doctype):
 	'''get open filters for doctype'''
 	config = get_notification_config()
 	doctype_config = config.get("for_doctype").get(doctype, {})
-	filters = doctype_config if not isinstance(doctype_config, str) else None
-
-	return filters
+	return doctype_config if not isinstance(doctype_config, str) else None
 
 @frappe.whitelist()
 @frappe.read_only()

@@ -25,10 +25,7 @@ class Page(Document):
 			if frappe.db.exists('Page',self.name):
 				cnt = frappe.db.sql("""select name from tabPage
 					where name like "%s-%%" order by name desc limit 1""" % self.name)
-				if cnt:
-					cnt = cint(cnt[0][0].split('-')[-1]) + 1
-				else:
-					cnt = 1
+				cnt = cint(cnt[0][0].split('-')[-1]) + 1 if cnt else 1
 				self.name += '-' + str(cnt)
 
 	def validate(self):
@@ -56,11 +53,9 @@ class Page(Document):
 		from frappe.modules.utils import export_module_json
 		path = export_module_json(self, self.standard=='Yes', self.module)
 
-		if path:
-			# js
-			if not os.path.exists(path + '.js'):
-				with open(path + '.js', 'w') as f:
-					f.write("""frappe.pages['%s'].on_page_load = function(wrapper) {
+		if path and not os.path.exists(path + '.js'):
+			with open(path + '.js', 'w') as f:
+				f.write("""frappe.pages['%s'].on_page_load = function(wrapper) {
 	var page = frappe.ui.make_app_page({
 		parent: wrapper,
 		title: '%s',

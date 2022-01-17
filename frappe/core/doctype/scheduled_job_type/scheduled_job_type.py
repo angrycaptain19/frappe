@@ -30,11 +30,10 @@ class ScheduledJobType(Document):
 
 			if frappe.flags.execute_job:
 				self.execute()
-			else:
-				if not self.is_job_in_queue():
-					enqueue('frappe.core.doctype.scheduled_job_type.scheduled_job_type.run_scheduled_job',
-						queue = self.get_queue_name(), job_type=self.method)
-					return True
+			elif not self.is_job_in_queue():
+				enqueue('frappe.core.doctype.scheduled_job_type.scheduled_job_type.run_scheduled_job',
+					queue = self.get_queue_name(), job_type=self.method)
+				return True
 
 		return False
 

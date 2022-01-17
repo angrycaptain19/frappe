@@ -40,10 +40,7 @@ def check_data_integrity(chaining_hash, transaction_hash, registered_previous_ha
 
 	calculated_chaining_hash = calculate_chain(transaction_hash, previous_hash)
 
-	if calculated_chaining_hash != chaining_hash:
-		return False
-	else:
-		return True
+	return calculated_chaining_hash == chaining_hash
 
 def calculate_chain(transaction_hash, previous_hash):
 	sha = hashlib.sha256()
@@ -52,7 +49,7 @@ def calculate_chain(transaction_hash, previous_hash):
 
 
 def get_columns(filters=None):
-	columns = [
+	return [
 		{
 			"label": _("Chain Integrity"),
 			"fieldname": "chain_integrity",
@@ -90,4 +87,3 @@ def get_columns(filters=None):
 			"width": 100
 		}
 	]
-	return columns

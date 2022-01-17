@@ -208,13 +208,11 @@ class Workspace:
 			else:
 				item.incomplete_dependencies = ""
 
-		if item.onboard:
-			# Mark Spotlights for initial
-			if item.get("type") == "doctype":
-				name = item.get("name")
-				count = self._doctype_contains_a_record(name)
+		if item.onboard and item.get("type") == "doctype":
+			name = item.get("name")
+			count = self._doctype_contains_a_record(name)
 
-				item["count"] = count
+			item["count"] = count
 
 		# Translate label
 		item["label"] = _(item.label) if item.label else _(item.name)
@@ -250,10 +248,7 @@ class Workspace:
 					new_items.append(prepared_item)
 
 			if new_items:
-				if isinstance(card, _dict):
-					new_card = card.copy()
-				else:
-					new_card = card.as_dict().copy()
+				new_card = card.copy() if isinstance(card, _dict) else card.as_dict().copy()
 				new_card["links"] = new_items
 				new_card["label"] = _(new_card["label"])
 				new_data.append(new_card)
@@ -421,16 +416,12 @@ def get_custom_reports_and_doctypes(module):
 def get_custom_doctype_list(module):
 	doctypes =  frappe.get_all("DocType", fields=["name"], filters={"custom": 1, "istable": 0, "module": module}, order_by="name")
 
-	out = []
-	for d in doctypes:
-		out.append({
+	return [{
 			"type": "Link",
 			"link_type": "doctype",
 			"link_to": d.name,
 			"label": _(d.name)
-		})
-
-	return out
+		} for d in doctypes]
 
 def get_custom_report_list(module):
 	"""Returns list on new style reports for modules."""
@@ -438,19 +429,23 @@ def get_custom_report_list(module):
 		{"is_standard": "No", "disabled": 0, "module": module},
 		order_by="name")
 
-	out = []
-	for r in reports:
-		out.append({
-			"type": "Link",
-			"link_type": "report",
-			"doctype": r.ref_doctype,
-			"dependencies": r.ref_doctype,
-			"is_query_report": 1 if r.report_type in ("Query Report", "Script Report", "Custom Report") else 0,
-			"label": _(r.name),
-			"link_to": r.name,
-		})
-
-	return out
+	return [{
+	    "type":
+	    "Link",
+	    "link_type":
+	    "report",
+	    "doctype":
+	    r.ref_doctype,
+	    "dependencies":
+	    r.ref_doctype,
+	    "is_query_report":
+	    1 if r.report_type in ("Query Report", "Script Report",
+	                           "Custom Report") else 0,
+	    "label":
+	    _(r.name),
+	    "link_to":
+	    r.name,
+	} for r in reports]
 
 def save_new_widget(doc, page, blocks, new_widgets):
 
@@ -486,11 +481,11 @@ def save_new_widget(doc, page, blocks, new_widgets):
 	return True
 
 def clean_up(original_page, blocks):
-	page_widgets = {}
-
-	for wid in ['shortcut', 'card', 'chart']:
-		# get list of widget's name from blocks
-		page_widgets[wid] = [x['data'][wid + '_name'] for x in loads(blocks) if x['type'] == wid]
+	page_widgets = {
+	    wid:
+	    [x['data'][wid + '_name'] for x in loads(blocks) if x['type'] == wid]
+	    for wid in ['shortcut', 'card', 'chart']
+	}
 
 	# shortcut & chart cleanup
 	for wid in ['shortcut', 'chart']:

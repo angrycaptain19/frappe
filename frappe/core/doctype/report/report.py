@@ -150,10 +150,7 @@ class Report(Document):
 		# server script
 		loc = {"filters": frappe._dict(filters), 'data':None, 'result':None}
 		safe_exec(self.report_script, None, loc)
-		if loc['data']:
-			return loc['data']
-		else:
-			return self.get_columns(), loc['result']
+		return loc['data'] or (self.get_columns(), loc['result'])
 
 	def get_data(self, filters=None, limit=None, user=None, as_dict=False, ignore_prepared_report=False):
 		if self.report_type in ('Query Report', 'Script Report', 'Custom Report'):
@@ -180,11 +177,10 @@ class Report(Document):
 			else:
 				fieldtype, options = "Data", None
 				parts = d.split(':')
-				if len(parts) > 1:
-					if parts[1]:
-						fieldtype, options = parts[1], None
-						if fieldtype and '/' in fieldtype:
-							fieldtype, options = fieldtype.split('/')
+				if len(parts) > 1 and parts[1]:
+					fieldtype, options = parts[1], None
+					if fieldtype and '/' in fieldtype:
+						fieldtype, options = fieldtype.split('/')
 
 				columns.append(frappe._dict(label=parts[0], fieldtype=fieldtype, fieldname=parts[0], options=options))
 
@@ -212,7 +208,7 @@ class Report(Document):
 
 		columns = self.build_standard_report_columns(columns, group_by_args)
 
-		result = result + [list(d) for d in _result]
+		result += [list(d) for d in _result]
 
 		if params.get('add_totals_row'):
 			result = append_totals_row(result)
@@ -327,27 +323,20 @@ def get_report_module_dotted_path(module, report_name):
 		+ ".report." + scrub(report_name) + "." + scrub(report_name)
 
 def get_group_by_field(args, doctype):
-	if args['aggregate_function'] == 'count':
-		group_by_field = 'count(*) as _aggregate_column'
-	else:
-		group_by_field = '{0}({1}) as _aggregate_column'.format(
-			args.aggregate_function,
-			args.aggregate_on
-		)
-
-	return group_by_field
+	return ('count(*) as _aggregate_column'
+	        if args['aggregate_function'] == 'count' else
+	        '{0}({1}) as _aggregate_column'.format(args.aggregate_function,
+	                                               args.aggregate_on))
 
 def get_group_by_column_label(args, meta):
 	if args['aggregate_function'] == 'count':
-		label = 'Count'
-	else:
-		sql_fn_map = {
-			'avg': 'Average',
-			'sum': 'Sum'
-		}
-		aggregate_on_label = meta.get_label(args.aggregate_on)
-		label = _('{function} of {fieldlabel}').format(
+		return 'Count'
+	sql_fn_map = {
+		'avg': 'Average',
+		'sum': 'Sum'
+	}
+	aggregate_on_label = meta.get_label(args.aggregate_on)
+	return _('{function} of {fieldlabel}').format(
 			function=sql_fn_map[args.aggregate_function],
 			fieldlabel = aggregate_on_label
 		)
-	return label

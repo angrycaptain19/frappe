@@ -39,7 +39,7 @@ def _new_site(
 		print("Site {0} already exists".format(site))
 		sys.exit(1)
 
-	if no_mariadb_socket and not db_type == "mariadb":
+	if no_mariadb_socket and db_type != "mariadb":
 		print("--no-mariadb-socket requires db_type to be set to mariadb.")
 		sys.exit(1)
 
@@ -184,7 +184,7 @@ def install_app(name, verbose=False, set_as_patched=True):
 
 def add_to_installed_apps(app_name, rebuild_website=True):
 	installed_apps = frappe.get_installed_apps()
-	if not app_name in installed_apps:
+	if app_name not in installed_apps:
 		installed_apps.append(app_name)
 		frappe.db.set_global("installed_apps", json.dumps(installed_apps))
 		frappe.db.commit()
@@ -211,10 +211,9 @@ def remove_app(app_name, dry_run=False, yes=False, no_backup=False, force=False)
 	app_hooks = frappe.get_hooks(app_name=app_name)
 
 	# dont allow uninstall app if not installed unless forced
-	if not force:
-		if app_name not in frappe.get_installed_apps():
-			click.secho(f"App {app_name} not installed on Site {site}", fg="yellow")
-			return
+	if not force and app_name not in frappe.get_installed_apps():
+		click.secho(f"App {app_name} not installed on Site {site}", fg="yellow")
+		return
 
 	print(f"Uninstalling App {app_name} from Site {site}...")
 
@@ -432,8 +431,8 @@ def get_site_config_path():
 def get_conf_params(db_name=None, db_password=None):
 	if not db_name:
 		db_name = input("Database Name: ")
-		if not db_name:
-			raise Exception("Database Name Required")
+	if not db_name:
+		raise Exception("Database Name Required")
 
 	if not db_password:
 		from frappe.utils import random_string

@@ -117,8 +117,7 @@ def get_value(doctype, fieldname, filters=None, as_dict=True, debug=False, paren
 def get_single_value(doctype, field):
 	if not frappe.has_permission(doctype):
 		frappe.throw(_("No permission for {0}").format(doctype), frappe.PermissionError)
-	value = frappe.db.get_single_value(doctype, field)
-	return value
+	return frappe.db.get_single_value(doctype, field)
 
 @frappe.whitelist(methods=['POST', 'PUT'])
 def set_value(doctype, name, fieldname, value=None):

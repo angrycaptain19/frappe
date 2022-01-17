@@ -136,9 +136,9 @@ def get_context(context):
 			frappe.log_error(title='Failed to send notification', message=frappe.get_traceback())
 
 		if self.set_property_after_alert:
-			allow_update = True
-			if doc.docstatus == 1 and not doc.meta.get_field(self.set_property_after_alert).allow_on_submit:
-				allow_update = False
+			allow_update = bool(
+			    doc.docstatus != 1
+			    or doc.meta.get_field(self.set_property_after_alert).allow_on_submit)
 			try:
 				if allow_update and not doc.flags.in_notification_update:
 					fieldname = self.set_property_after_alert
@@ -248,9 +248,9 @@ def get_context(context):
 		cc = []
 		bcc = []
 		for recipient in self.recipients:
-			if recipient.condition:
-				if not frappe.safe_eval(recipient.condition, None, context):
-					continue
+			if recipient.condition and not frappe.safe_eval(recipient.condition, None,
+			                                                context):
+				continue
 			if recipient.receiver_by_document_field:
 				fields = recipient.receiver_by_document_field.split(',')
 				# fields from child table
@@ -259,36 +259,35 @@ def get_context(context):
 						email_id = d.get(fields[0])
 						if validate_email_address(email_id):
 							recipients.append(email_id)
-				# field from parent doc
 				else:
 					email_ids_value = doc.get(fields[0])
 					if validate_email_address(email_ids_value):
 						email_ids = email_ids_value.replace(",", "\n")
-						recipients = recipients + email_ids.split("\n")
+						recipients += email_ids.split("\n")
 
 			if recipient.cc and "{" in recipient.cc:
 				recipient.cc = frappe.render_template(recipient.cc, context)
 
 			if recipient.cc:
 				recipient.cc = recipient.cc.replace(",", "\n")
-				cc = cc + recipient.cc.split("\n")
+				cc += recipient.cc.split("\n")
 
 			if recipient.bcc and "{" in recipient.bcc:
 				recipient.bcc = frappe.render_template(recipient.bcc, context)
 
 			if recipient.bcc:
 				recipient.bcc = recipient.bcc.replace(",", "\n")
-				bcc = bcc + recipient.bcc.split("\n")
+				bcc += recipient.bcc.split("\n")
 
 			#For sending emails to specified role
 			if recipient.receiver_by_role:
 				emails = get_info_based_on_role(recipient.receiver_by_role, 'email')
 
 				for email in emails:
-					recipients = recipients + email.split("\n")
+					recipients += email.split("\n")
 
 		if self.send_to_all_assignees:
-			recipients = recipients + get_assignees(doc)
+			recipients += get_assignees(doc)
 
 		return list(set(recipients)), list(set(cc)), list(set(bcc))
 
@@ -296,9 +295,9 @@ def get_context(context):
 		''' return receiver list based on the doc field and role specified '''
 		receiver_list = []
 		for recipient in self.recipients:
-			if recipient.condition:
-				if not frappe.safe_eval(recipient.condition, None, context):
-					continue
+			if recipient.condition and not frappe.safe_eval(recipient.condition, None,
+			                                                context):
+				continue
 
 			# For sending messages to the owner's mobile phone number
 			if recipient.receiver_by_document_field == 'owner':
@@ -319,14 +318,8 @@ def get_context(context):
 			return None
 
 		print_settings = frappe.get_doc("Print Settings", "Print Settings")
-		if (doc.docstatus == 0 and not print_settings.allow_print_for_draft) or \
-			(doc.docstatus == 2 and not print_settings.allow_print_for_cancelled):
-
-			# ignoring attachment as draft and cancelled documents are not allowed to print
-			status = "Draft" if doc.docstatus == 0 else "Cancelled"
-			frappe.throw(_("""Not allowed to attach {0} document, please enable Allow Print For {0} in Print Settings""").format(status),
-				title=_("Error in Notification"))
-		else:
+		if (doc.docstatus != 0 or print_settings.allow_print_for_draft) and (
+		    doc.docstatus != 2 or print_settings.allow_print_for_cancelled):
 			return [{
 				"print_format_attachment": 1,
 				"doctype": doc.doctype,
@@ -336,6 +329,10 @@ def get_context(context):
 				"lang": frappe.db.get_value('Print Format', self.print_format, 'default_print_language')
 					if self.print_format else 'en'
 			}]
+		# ignoring attachment as draft and cancelled documents are not allowed to print
+		status = "Draft" if doc.docstatus == 0 else "Cancelled"
+		frappe.throw(_("""Not allowed to attach {0} document, please enable Allow Print For {0} in Print Settings""").format(status),
+			title=_("Error in Notification"))
 
 
 	def get_template(self):
@@ -354,10 +351,9 @@ def get_context(context):
 	def load_standard_properties(self, context):
 		'''load templates and run get_context'''
 		module = get_doc_module(self.module, self.doctype, self.name)
-		if module:
-			if hasattr(module, 'get_context'):
-				out = module.get_context(context)
-				if out: context.update(out)
+		if module and hasattr(module, 'get_context'):
+			out = module.get_context(context)
+			if out: context.update(out)
 
 		self.message = self.get_template()
 
@@ -399,9 +395,8 @@ def evaluate_alert(doc, alert, event):
 
 		context = get_context(doc)
 
-		if alert.condition:
-			if not frappe.safe_eval(alert.condition, None, context):
-				return
+		if alert.condition and not frappe.safe_eval(alert.condition, None, context):
+			return
 
 		if event=="Value Change" and not doc.is_new():
 			if not frappe.db.has_column(doc.doctype, alert.value_changed):
@@ -437,6 +432,4 @@ def get_assignees(doc):
 	assignees = frappe.get_all('ToDo', filters={'status': 'Open', 'reference_name': doc.name,
 		'reference_type': doc.doctype}, fields=['allocated_to'])
 
-	recipients = [d.allocated_to for d in assignees]
-
-	return recipients
+	return [d.allocated_to for d in assignees]

@@ -18,13 +18,11 @@ from frappe.utils import add_user_info
 @frappe.read_only()
 def get():
 	args = get_form_params()
-	# If virtual doctype get data from controller het_list method
-	if frappe.db.get_value("DocType", filters={"name": args.doctype}, fieldname="is_virtual"):
-		controller = get_controller(args.doctype)
-		data = compress(controller(args.doctype).get_list(args))
-	else:
-		data = compress(execute(**args), args=args)
-	return data
+	if not frappe.db.get_value(
+	    "DocType", filters={"name": args.doctype}, fieldname="is_virtual"):
+		return compress(execute(**args), args=args)
+	controller = get_controller(args.doctype)
+	return compress(controller(args.doctype).get_list(args))
 
 @frappe.whitelist()
 @frappe.read_only()
@@ -86,9 +84,11 @@ def validate_fields(data):
 			data.fields.remove(field)
 			continue
 
-		if df.fieldname in [_df.fieldname for _df in meta.get_high_permlevel_fields()]:
-			if df.get('permlevel') not in meta.get_permlevel_access(parenttype=data.doctype):
-				data.fields.remove(field)
+		if df.fieldname in [
+		    _df.fieldname for _df in meta.get_high_permlevel_fields()
+		] and df.get('permlevel') not in meta.get_permlevel_access(
+		    parenttype=data.doctype):
+			data.fields.remove(field)
 
 def validate_filters(data, filters):
 	if isinstance(filters, list):
@@ -227,9 +227,7 @@ def compress(data, args=None):
 	values = []
 	keys = list(data[0])
 	for row in data:
-		new_row = []
-		for key in keys:
-			new_row.append(row.get(key))
+		new_row = [row.get(key) for key in keys]
 		values.append(new_row)
 
 		# add user info for assignments (avatar)
@@ -461,7 +459,7 @@ def get_stats(stats, doctype, filters=None):
 		columns = []
 
 	for tag in tags:
-		if not tag in columns: continue
+		if tag not in columns: continue
 		try:
 			tag_count = frappe.get_list(doctype,
 				fields=[tag, "count(*)"],
@@ -505,7 +503,7 @@ def get_filter_dashboard_data(stats, doctype, filters=None):
 
 	columns = frappe.db.get_table_columns(doctype)
 	for tag in tags:
-		if not tag["name"] in columns: continue
+		if tag["name"] not in columns: continue
 		tagcount = []
 		if tag["type"] not in ['Date', 'Datetime']:
 			tagcount = frappe.get_list(doctype,
@@ -534,22 +532,18 @@ def scrub_user_tags(tagcount):
 	"""rebuild tag list for tags"""
 	rdict = {}
 	tagdict = dict(tagcount)
-	for t in tagdict:
+	for t, value_ in tagdict.items():
 		if not t:
 			continue
 		alltags = t.split(',')
 		for tag in alltags:
 			if tag:
-				if not tag in rdict:
+				if tag not in rdict:
 					rdict[tag] = 0
 
-				rdict[tag] += tagdict[t]
+				rdict[tag] += value_
 
-	rlist = []
-	for tag in rdict:
-		rlist.append([tag, rdict[tag]])
-
-	return rlist
+	return [[tag, value] for tag, value in rdict.items()]
 
 # used in building query in queries.py
 def get_match_cond(doctype, as_condition=True):
@@ -570,31 +564,29 @@ def get_filters_cond(doctype, filters, conditions, ignore_permissions=None, with
 	if isinstance(filters, str):
 		filters = json.loads(filters)
 
-	if filters:
-		flt = filters
-		if isinstance(filters, dict):
-			filters = filters.items()
-			flt = []
-			for f in filters:
-				if isinstance(f[1], str) and f[1][0] == '!':
-					flt.append([doctype, f[0], '!=', f[1][1:]])
-				elif isinstance(f[1], (list, tuple)) and \
-					f[1][0] in (">", "<", ">=", "<=", "!=", "like", "not like", "in", "not in", "between"):
+	if not filters:
+		return ''
+	flt = filters
+	if isinstance(filters, dict):
+		filters = filters.items()
+		flt = []
+		for f in filters:
+			if isinstance(f[1], str) and f[1][0] == '!':
+				flt.append([doctype, f[0], '!=', f[1][1:]])
+			elif isinstance(f[1], (list, tuple)) and \
+				f[1][0] in (">", "<", ">=", "<=", "!=", "like", "not like", "in", "not in", "between"):
 
-					flt.append([doctype, f[0], f[1][0], f[1][1]])
-				else:
-					flt.append([doctype, f[0], '=', f[1]])
+				flt.append([doctype, f[0], f[1][0], f[1][1]])
+			else:
+				flt.append([doctype, f[0], '=', f[1]])
 
-		query = DatabaseQuery(doctype)
-		query.filters = flt
-		query.conditions = conditions
+	query = DatabaseQuery(doctype)
+	query.filters = flt
+	query.conditions = conditions
 
-		if with_match_conditions:
-			query.build_match_conditions()
+	if with_match_conditions:
+		query.build_match_conditions()
 
-		query.build_filter_conditions(flt, conditions, ignore_permissions)
+	query.build_filter_conditions(flt, conditions, ignore_permissions)
 
-		cond = ' and ' + ' and '.join(query.conditions)
-	else:
-		cond = ''
-	return cond
+	return ' and ' + ' and '.join(query.conditions)

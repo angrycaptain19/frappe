@@ -224,14 +224,13 @@ def user_linked_with_permission_on_doctype(doc, user):
 	if frappe.db.get_value(doc.apply_user_permission_on,
 		{doc.user_id_field: user}, 'name'):
 		return True
-	else:
-		label = frappe.get_meta(doc.apply_user_permission_on).get_field(doc.user_id_field).label
+	label = frappe.get_meta(doc.apply_user_permission_on).get_field(doc.user_id_field).label
 
-		frappe.msgprint(_("To set the role {0} in the user {1}, kindly set the {2} field as {3} in one of the {4} record.")
-			.format(frappe.bold(doc.role), frappe.bold(user), frappe.bold(label),
-				frappe.bold(user), frappe.bold(doc.apply_user_permission_on)))
+	frappe.msgprint(_("To set the role {0} in the user {1}, kindly set the {2} field as {3} in one of the {4} record.")
+		.format(frappe.bold(doc.role), frappe.bold(user), frappe.bold(label),
+			frappe.bold(user), frappe.bold(doc.apply_user_permission_on)))
 
-		return False
+	return False
 
 def apply_permissions_for_non_standard_user_type(doc, method=None):
 	'''Create user permission for the non standard user type'''

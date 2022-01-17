@@ -377,7 +377,7 @@ class ImportFile:
 		self.columns = self.header.columns
 		self.data = data
 
-		if len(data) < 1:
+		if not data:
 			frappe.throw(
 				_("Import template should contain a Header and atleast one row."),
 				title=_("Template Error"),
@@ -551,8 +551,7 @@ class Row:
 			return None
 
 		columns = self.header.get_columns(col_indexes)
-		doc = self._parse_doc(doctype, columns, values, parent_doc, table_df)
-		return doc
+		return self._parse_doc(doctype, columns, values, parent_doc, table_df)
 
 	def _parse_doc(self, doctype, columns, values, parent_doc=None, table_df=None):
 		doc = frappe._dict()
@@ -812,11 +811,7 @@ class Column:
 			df = get_df_for_column_header(self.doctype, header_title)
 			# df = df_by_labels_and_fieldnames.get(header_title)
 
-		if not df:
-			skip_import = True
-		else:
-			skip_import = False
-
+		skip_import = not df
 		if header_title in self.seen:
 			self.warnings.append(
 				{

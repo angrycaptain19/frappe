@@ -38,11 +38,10 @@ def create_rq_users(set_admin_password=False, use_rq_auth=False):
 		fg='green')
 
 	if set_admin_password:
-		env_key = 'RQ_ADMIN_PASWORD'
 		click.secho('* Redis admin password is successfully set up. '
 			'Include below line in .bashrc file for system to use',
 			fg='green')
-		click.secho(f"`export {env_key}={user_credentials['default'][1]}`")
+		click.secho(f'`export RQ_ADMIN_PASWORD={user_credentials["default"][1]}`')
 		click.secho('NOTE: Please save the admin password as you '
 			'can not access redis server without the password',
 			fg='yellow')

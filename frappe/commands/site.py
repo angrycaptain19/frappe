@@ -101,15 +101,13 @@ def restore(context, sql_file_path, encryption_key=None, mariadb_root_username=N
 				"Encrypted backup file detected. Decrypting using provided key.",
 				fg="yellow"
 			)
-			_backup.backup_decryption(encryption_key)
-
 		else:
 			click.secho(
 				"Encrypted backup file detected. Decrypting using site config.",
 				fg="yellow"
 			)
 			encryption_key = frappe.get_site_config().encryption_key
-			_backup.backup_decryption(encryption_key)
+		_backup.backup_decryption(encryption_key)
 
 		# Rollback on unsuccessful decryrption
 		if not os.path.exists(sql_file_path):
@@ -681,9 +679,7 @@ def _drop_site(site, root_login='root', root_password=None, archived_sites_path=
 		if not no_backup:
 			scheduled_backup(ignore_files=False, force=True)
 	except Exception as err:
-		if force:
-			pass
-		else:
+		if not force:
 			messages = [
 				"=" * 80,
 				"Error: The operation has stopped because backup of {0}'s database failed.".format(site),
@@ -956,10 +952,7 @@ def trim_database(context, dry_run, format, no_backup):
 			if not (doctype in doctype_tables or x.startswith("__") or x in STANDARD_TABLES):
 				TABLES_TO_DROP.append(x)
 
-		if not TABLES_TO_DROP:
-			if format == "text":
-				click.secho(f"No ghost tables found in {frappe.local.site}...Great!", fg="green")
-		else:
+		if TABLES_TO_DROP:
 			if not (no_backup or dry_run):
 				if format == "text":
 					print(f"Backing Up Tables: {', '.join(TABLES_TO_DROP)}")
@@ -981,6 +974,8 @@ def trim_database(context, dry_run, format, no_backup):
 					frappe.db.sql_ddl(f"drop table `{table}`")
 
 			ALL_DATA[frappe.local.site] = TABLES_TO_DROP
+		elif format == "text":
+			click.secho(f"No ghost tables found in {frappe.local.site}...Great!", fg="green")
 		frappe.destroy()
 
 	if format == "json":

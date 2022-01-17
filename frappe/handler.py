@@ -25,10 +25,8 @@ def handle():
 	"""handle request"""
 
 	cmd = frappe.local.form_dict.cmd
-	data = None
 
-	if cmd != 'login':
-		data = execute_cmd(cmd)
+	data = execute_cmd(cmd) if cmd != 'login' else None
 
 	# data can be an empty string or list which are valid responses
 	if data is not None:
@@ -128,11 +126,10 @@ def uploadfile():
 				# ignore pass
 				ret = None
 				frappe.db.rollback()
-		else:
-			if frappe.form_dict.get('method'):
-				method = frappe.get_attr(frappe.form_dict.method)
-				is_whitelisted(method)
-				ret = method()
+		elif frappe.form_dict.get('method'):
+			method = frappe.get_attr(frappe.form_dict.method)
+			is_whitelisted(method)
+			ret = method()
 	except Exception:
 		frappe.errprint(frappe.utils.get_traceback())
 		frappe.response['http_status_code'] = 500
@@ -211,10 +208,7 @@ def upload_file():
 
 def get_attr(cmd):
 	"""get method object from cmd"""
-	if '.' in cmd:
-		method = frappe.get_attr(cmd)
-	else:
-		method = globals()[cmd]
+	method = frappe.get_attr(cmd) if '.' in cmd else globals()[cmd]
 	frappe.log("method:" + cmd)
 	return method
 

@@ -49,10 +49,7 @@ class Exporter:
 		self.fields = self.serialize_exportable_fields()
 		self.add_header()
 
-		if export_data:
-			self.data = self.get_data_to_export()
-		else:
-			self.data = []
+		self.data = self.get_data_to_export() if export_data else []
 		self.add_data()
 
 	def get_all_exportable_fields(self):
@@ -135,8 +132,7 @@ class Exporter:
 						child_doctype = table_df.options
 						rows = self.add_data_row(child_doctype, child_row.parentfield, child_row, rows, i)
 
-			for row in rows:
-				yield row
+			yield from rows
 
 	def add_data_row(self, doctype, parentfield, doc, rows, row_idx):
 		if len(rows) < row_idx + 1:

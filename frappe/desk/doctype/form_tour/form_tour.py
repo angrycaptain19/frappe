@@ -49,7 +49,7 @@ def get_docfield_list(doctype, txt, searchfield, start, page_len, filters):
 	else:
 		fieldtype_filter = fieldtype
 
-	docfields = frappe.get_all(
+	return frappe.get_all(
 		doctype,
 		fields=["name as value", "label", "fieldtype"],
 		filters={'parent': parent_doctype, 'fieldtype': fieldtype_filter},
@@ -59,4 +59,3 @@ def get_docfield_list(doctype, txt, searchfield, start, page_len, filters):
 		order_by="idx",
 		as_list=1,
 	)
-	return docfields

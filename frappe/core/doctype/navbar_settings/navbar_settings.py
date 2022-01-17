@@ -33,5 +33,4 @@ def get_app_logo():
 	return app_logo
 
 def get_navbar_settings():
-	navbar_settings = frappe.get_single('Navbar Settings')
-	return navbar_settings
+	return frappe.get_single('Navbar Settings')

@@ -69,25 +69,30 @@ class HTTPRequest:
 		frappe.local.login_manager = LoginManager()
 
 	def validate_csrf_token(self):
-		if frappe.local.request and frappe.local.request.method in ("POST", "PUT", "DELETE"):
-			if not frappe.local.session:
-				return
-			if (
-				not frappe.local.session.data.csrf_token
-				or frappe.local.session.data.device == "mobile"
-				or frappe.conf.get('ignore_csrf', None)
-			):
-				# not via boot
-				return
+		if not frappe.local.request or frappe.local.request.method not in (
+		    "POST",
+		    "PUT",
+		    "DELETE",
+		):
+			return
+		if not frappe.local.session:
+			return
+		if (
+			not frappe.local.session.data.csrf_token
+			or frappe.local.session.data.device == "mobile"
+			or frappe.conf.get('ignore_csrf', None)
+		):
+			# not via boot
+			return
 
-			csrf_token = frappe.get_request_header("X-Frappe-CSRF-Token")
-			if not csrf_token and "csrf_token" in frappe.local.form_dict:
-				csrf_token = frappe.local.form_dict.csrf_token
-				del frappe.local.form_dict["csrf_token"]
+		csrf_token = frappe.get_request_header("X-Frappe-CSRF-Token")
+		if not csrf_token and "csrf_token" in frappe.local.form_dict:
+			csrf_token = frappe.local.form_dict.csrf_token
+			del frappe.local.form_dict["csrf_token"]
 
-			if frappe.local.session.data.csrf_token != csrf_token:
-				frappe.local.flags.disable_traceback = True
-				frappe.throw(_("Invalid Request"), frappe.CSRFTokenError)
+		if frappe.local.session.data.csrf_token != csrf_token:
+			frappe.local.flags.disable_traceback = True
+			frappe.throw(_("Invalid Request"), frappe.CSRFTokenError)
 
 	def set_lang(self):
 		frappe.local.lang = get_language()

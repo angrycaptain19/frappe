@@ -438,8 +438,7 @@ class TestInboundMail(unittest.TestCase):
 def cleanup(sender=None):
 	filters = {}
 	if sender:
-		filters.update({"sender": sender})
-
+		filters["sender"] = sender
 	names = frappe.get_list("Communication", filters=filters, fields=["name"])
 	for name in names:
 		frappe.delete_doc_if_exists("Communication", name.name)

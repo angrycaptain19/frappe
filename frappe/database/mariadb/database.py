@@ -199,7 +199,7 @@ class MariaDBDatabase(Database):
 			) ENGINE=InnoDB ROW_FORMAT=DYNAMIC CHARACTER SET=utf8mb4 COLLATE=utf8mb4_unicode_ci""")
 
 	def create_global_search_table(self):
-		if not '__global_search' in self.get_tables():
+		if '__global_search' not in self.get_tables():
 			self.sql('''create table __global_search(
 				doctype varchar(100),
 				name varchar({0}),

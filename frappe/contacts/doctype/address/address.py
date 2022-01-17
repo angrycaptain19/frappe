@@ -19,9 +19,8 @@ class Address(Document):
 		self.flags.linked = False
 
 	def autoname(self):
-		if not self.address_title:
-			if self.links:
-				self.address_title = self.links[0].link_name
+		if not self.address_title and self.links:
+			self.address_title = self.links[0].link_name
 
 		if self.address_title:
 			self.name = (cstr(self.address_title).strip() + "-" + cstr(_(self.address_type)).strip())
@@ -70,11 +69,8 @@ class Address(Document):
 
 	def has_common_link(self, doc):
 		reference_links = [(link.link_doctype, link.link_name) for link in doc.links]
-		for link in self.links:
-			if (link.link_doctype, link.link_name) in reference_links:
-				return True
-
-		return False
+		return any((link.link_doctype, link.link_name) in reference_links
+		           for link in self.links)
 
 def get_preferred_address(doctype, name, preferred_key='is_primary_address'):
 	if preferred_key in ['is_shipping_address', 'is_primary_address']:
@@ -108,13 +104,12 @@ def get_default_address(doctype, name, sort_key='is_primary_address'):
 			dl.link_name = %s and ifnull(addr.disabled, 0) = 0
 		""" %(sort_key, '%s', '%s'), (doctype, name), as_dict=True)
 
-	if out:
-		for contact in out:
-			if contact.get(sort_key):
-				return contact.name
-		return out[0].name
-	else:
+	if not out:
 		return None
+	for contact in out:
+		if contact.get(sort_key):
+			return contact.name
+	return out[0].name
 
 
 @frappe.whitelist()
@@ -206,14 +201,12 @@ def address_query(doctype, txt, searchfield, start, page_len, filters):
 	link_doctype = filters.pop('link_doctype')
 	link_name = filters.pop('link_name')
 
-	condition = ""
 	meta = frappe.get_meta("Address")
-	for fieldname, value in filters.items():
-		if meta.get_field(fieldname) or fieldname in frappe.db.DEFAULT_COLUMNS:
-			condition += " and {field}={value}".format(
-				field=fieldname,
-				value=frappe.db.escape(value))
-
+	condition = "".join(
+	    " and {field}={value}".format(
+	        field=fieldname, value=frappe.db.escape(value))
+	    for fieldname, value in filters.items()
+	    if meta.get_field(fieldname) or fieldname in frappe.db.DEFAULT_COLUMNS)
 	searchfields = meta.get_search_fields()
 
 	if searchfield and (meta.get_field(searchfield)\
@@ -222,7 +215,7 @@ def address_query(doctype, txt, searchfield, start, page_len, filters):
 
 	search_condition = ''
 	for field in searchfields:
-		if search_condition == '':
+		if not search_condition:
 			search_condition += '`tabAddress`.`{field}` like %(txt)s'.format(field=field)
 		else:
 			search_condition += ' or `tabAddress`.`{field}` like %(txt)s'.format(field=field)

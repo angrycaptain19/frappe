@@ -21,9 +21,8 @@ def get_mariadb_versions():
 	# Example: Version 10.3.13 is Major Version = 10.3, Minor Version = 13
 	mariadb_variables = frappe._dict(frappe.db.sql("""show variables"""))
 	version_string = mariadb_variables.get('version').split('-')[0]
-	versions = {}
-	versions['major'] = version_string.split(
-		'.')[0] + '.' + version_string.split('.')[1]
+	versions = {'major': (version_string.split(
+		'.')[0] + '.' + version_string.split('.')[1])}
 	versions['minor'] = version_string.split('.')[2]
 	return versions
 
@@ -38,12 +37,11 @@ def setup_database(force, source_sql, verbose, no_mariadb_socket=False):
 	if no_mariadb_socket:
 		dbman_kwargs["host"] = "%"
 
-	if force or (db_name not in dbman.get_database_list()):
-		dbman.delete_user(db_name, **dbman_kwargs)
-		dbman.drop_database(db_name)
-	else:
+	if not force and db_name in dbman.get_database_list():
 		raise Exception("Database %s already exists" % (db_name,))
 
+	dbman.delete_user(db_name, **dbman_kwargs)
+	dbman.drop_database(db_name)
 	dbman.create_user(db_name, frappe.conf.db_password, **dbman_kwargs)
 	if verbose: print("Created user %s" % db_name)
 
@@ -64,7 +62,7 @@ def setup_help_database(help_db_name):
 	dbman.drop_database(help_db_name)
 
 	# make database
-	if not help_db_name in dbman.get_database_list():
+	if help_db_name not in dbman.get_database_list():
 		try:
 			dbman.create_user(help_db_name, help_db_name)
 		except Exception as e:

@@ -49,11 +49,7 @@ def import_db_from_sql(source_sql=None, verbose=False):
 
 	pv = which('pv')
 
-	_command = (
-		f"psql {frappe.conf.db_name} "
-		f"-h {frappe.conf.db_host or 'localhost'} -p {str(frappe.conf.db_port or '5432')} "
-		f"-U {frappe.conf.db_name}"
-	)
+	_command = f'psql {frappe.conf.db_name} -h {frappe.conf.db_host or "localhost"} -p {frappe.conf.db_port or "5432"} -U {frappe.conf.db_name}'
 
 	if pv:
 		command = f"{pv} {source_sql} | " + _command

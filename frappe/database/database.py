@@ -178,9 +178,8 @@ class Database(object):
 			elif frappe.conf.db_type == 'postgres':
 				raise
 
-			if ignore_ddl and (self.is_missing_column(e) or self.is_missing_table(e) or self.cant_drop_field_or_key(e)):
-				pass
-			else:
+			if (not ignore_ddl or not self.is_missing_column(e)
+			    and not self.is_missing_table(e) and not self.cant_drop_field_or_key(e)):
 				raise
 
 		if auto_commit: self.commit()
@@ -198,9 +197,7 @@ class Database(object):
 				for r in ret:
 					r.update(update)
 			return ret
-		elif as_list:
-			return self.convert_to_lists(self._cursor.fetchall(), formatted, as_utf8)
-		elif as_utf8:
+		elif as_list or as_utf8:
 			return self.convert_to_lists(self._cursor.fetchall(), formatted, as_utf8)
 		else:
 			return self._cursor.fetchall()
@@ -226,11 +223,10 @@ class Database(object):
 		'''build the query string with values'''
 		if not values:
 			return query
-		else:
-			try:
-				return self._cursor.mogrify(query, values)
-			except: # noqa: E722
-				return (query, values)
+		try:
+			return self._cursor.mogrify(query, values)
+		except: # noqa: E722
+			return (query, values)
 
 	def explain_query(self, query, values=None):
 		"""Print `EXPLAIN` in error log."""
@@ -433,11 +429,7 @@ class Database(object):
 		else:
 			fields = fieldname
 			if fieldname!="*":
-				if isinstance(fieldname, str):
-					fields = [fieldname]
-				else:
-					fields = fieldname
-
+				fields = [fieldname] if isinstance(fieldname, str) else fieldname
 			if (filters is not None) and (filters!=doctype or doctype=="DocType"):
 				try:
 					if order_by:
@@ -495,7 +487,7 @@ class Database(object):
 		# if not frappe.model.meta.is_single(doctype):
 		# 	raise frappe.DoesNotExistError("DocType", doctype)
 
-		if fields=="*" or isinstance(filters, dict):
+		if fields == "*" or isinstance(filters, dict):
 			# check if single doc matches with filters
 			values = self.get_singles_dict(doctype)
 			if isinstance(filters, dict):
@@ -519,16 +511,14 @@ class Database(object):
 
 			if not run:
 				return r
-			if as_dict:
-				if r:
-					r = frappe._dict(r)
-					if update:
-						r.update(update)
-					return [r]
-				else:
-					return []
-			else:
+			if not as_dict:
 				return r and [[i[1] for i in r]] or []
+			if not r:
+				return []
+			r = frappe._dict(r)
+			if update:
+				r.update(update)
+			return [r]
 
 
 	def get_singles_dict(self, doctype, debug = False):
@@ -544,8 +534,7 @@ class Database(object):
 		result = self.query.get_sql(
 			"Singles", filters={"doctype": doctype}, fields=["field", "value"]
 		).run()
-		dict_  = frappe._dict(result)
-		return dict_
+		return frappe._dict(result)
 
 	@staticmethod
 	def get_all(*args, **kwargs):
@@ -567,7 +556,7 @@ class Database(object):
 			company = frappe.db.get_single_value('Global Defaults', 'default_company')
 		"""
 
-		if not doctype in self.value_cache:
+		if doctype not in self.value_cache:
 			self.value_cache[doctype] = {}
 
 		if fieldname in self.value_cache[doctype]:
@@ -634,10 +623,9 @@ class Database(object):
 		):
 			as_dict = True
 
-		r = self.sql(
+		return self.sql(
 			query, as_dict=as_dict, debug=debug, update=update, run=run, pluck=pluck
 		)
-		return r
 
 	def _get_value_for_many_names(self, doctype, names, field, order_by, debug=False, run=True, pluck=False, distinct=False):
 		names = list(filter(None, names))
@@ -689,14 +677,10 @@ class Database(object):
 		if isinstance(field, dict):
 			to_update.update(field)
 		else:
-			to_update.update({field: val})
-
+			to_update[field] = val
 		if dn and dt!=dn:
 			# with table
-			set_values = []
-			for key in to_update:
-				set_values.append('`{0}`=%({0})s'.format(key))
-
+			set_values = ['`{0}`=%({0})s'.format(key) for key in to_update]
 			for name in self.get_values(dt, dn, 'name', for_update=for_update, debug=debug):
 				values = dict(name=name[0])
 				values.update(to_update)
@@ -775,14 +759,13 @@ class Database(object):
 	@staticmethod
 	def get_defaults(key=None, parent="__default"):
 		"""Get all defaults"""
-		if key:
-			defaults = frappe.defaults.get_defaults(parent)
-			d = defaults.get(key, None)
-			if(not d and key != frappe.scrub(key)):
-				d = defaults.get(frappe.scrub(key), None)
-			return d
-		else:
+		if not key:
 			return frappe.defaults.get_defaults(parent)
+		defaults = frappe.defaults.get_defaults(parent)
+		d = defaults.get(key, None)
+		if(not d and key != frappe.scrub(key)):
+			d = defaults.get(frappe.scrub(key), None)
+		return d
 
 	def begin(self):
 		self.sql("START TRANSACTION")
@@ -879,10 +862,7 @@ class Database(object):
 
 		elif isinstance(dt, dict) and dt.get('doctype'):
 			try:
-				conditions = []
-				for d in dt:
-					if d == 'doctype': continue
-					conditions.append([d, '=', dt[d]])
+				conditions = [[d, '=', dt[d]] for d in dt if d != 'doctype']
 				return self.get_all(dt['doctype'], filters=conditions, as_list=1)
 			except Exception:
 				return None
@@ -896,12 +876,12 @@ class Database(object):
 		query = self.query.get_sql(table=dt, filters=filters, fields=Count("*"))
 		if filters:
 			count = self.sql(query, debug=debug)[0][0]
-			return count
 		else:
 			count = self.sql(query, debug=debug)[0][0]
 			if cache:
 				frappe.cache().set_value('doctype:count:{}'.format(dt), count, expires_in_sec = 86400)
-			return count
+
+		return count
 
 	@staticmethod
 	def format_date(date):
@@ -1043,10 +1023,7 @@ class Database(object):
 
 	def get_last_created(self, doctype):
 		last_record = self.get_all(doctype, ('creation'), limit=1, order_by='creation desc')
-		if last_record:
-			return get_datetime(last_record[0].creation)
-		else:
-			return None
+		return get_datetime(last_record[0].creation) if last_record else None
 
 	def log_touched_tables(self, query, values=None):
 		if values:

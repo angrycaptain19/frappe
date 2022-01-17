@@ -209,11 +209,7 @@ def execute(context, method, args=None, kwargs=None, profile=False):
 			else:
 				args = ()
 
-			if kwargs:
-				kwargs = eval(kwargs)
-			else:
-				kwargs = {}
-
+			kwargs = eval(kwargs) if kwargs else {}
 			if profile:
 				import cProfile
 				pr = cProfile.Profile()
@@ -746,11 +742,7 @@ def serve(context, port=None, profile=False, no_reload=False, no_threading=False
 	"Start development web server"
 	import frappe.app
 
-	if not context.sites:
-		site = None
-	else:
-		site = context.sites[0]
-
+	site = None if not context.sites else context.sites[0]
 	frappe.app.serve(port=port, profile=profile, no_reload=no_reload, no_threading=no_threading, site=site, sites_path='.')
 
 

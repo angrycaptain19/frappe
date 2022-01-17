@@ -152,7 +152,7 @@ class DocType(Document):
 		if not [d.fieldname for d in self.fields if d.in_list_view]:
 			cnt = 0
 			for d in self.fields:
-				if d.reqd and not d.hidden and not d.fieldtype in table_fields:
+				if d.reqd and not d.hidden and d.fieldtype not in table_fields:
 					d.in_list_view = 1
 					cnt += 1
 					if cnt == 4: break
@@ -190,7 +190,10 @@ class DocType(Document):
 
 		self.flags.update_fields_to_fetch_queries = []
 
-		if set(old_fields_to_fetch) != set(df.fieldname for df in new_meta.get_fields_to_fetch()):
+		if set(old_fields_to_fetch) != {
+		    df.fieldname
+		    for df in new_meta.get_fields_to_fetch()
+		}:
 			for df in new_meta.get_fields_to_fetch():
 				if df.fieldname not in old_fields_to_fetch:
 					link_fieldname, source_fieldname = df.fetch_from.split('.', 1)
@@ -241,7 +244,7 @@ class DocType(Document):
 
 		if self.has_web_view:
 			# route field must be present
-			if not 'route' in [d.fieldname for d in self.fields]:
+			if 'route' not in [d.fieldname for d in self.fields]:
 				frappe.throw(_('Field "route" is mandatory for Web Views'), title='Missing Field')
 
 			# clear website cache
@@ -291,9 +294,8 @@ class DocType(Document):
 							d.fieldname = d.fieldname + '_tab'
 					else:
 						d.fieldname = d.fieldtype.lower().replace(" ","_") + "_" + str(d.idx)
-				else:
-					if d.fieldname in restricted:
-						frappe.throw(_("Fieldname {0} is restricted").format(d.fieldname), InvalidFieldNameError)
+				elif d.fieldname in restricted:
+					frappe.throw(_("Fieldname {0} is restricted").format(d.fieldname), InvalidFieldNameError)
 
 				d.fieldname = re.sub('''['",./%@()<>{}]''', '', d.fieldname)
 
@@ -622,12 +624,16 @@ class DocType(Document):
 
 	def make_repeatable(self):
 		"""If allow_auto_repeat is set, add auto_repeat custom field."""
-		if self.allow_auto_repeat:
-			if not frappe.db.exists('Custom Field', {'fieldname': 'auto_repeat', 'dt': self.name}) and \
-				not frappe.db.exists('DocField', {'fieldname': 'auto_repeat', 'parent': self.name}):
-				insert_after = self.fields[len(self.fields) - 1].fieldname
-				df = dict(fieldname='auto_repeat', label='Auto Repeat', fieldtype='Link', options='Auto Repeat', insert_after=insert_after, read_only=1, no_copy=1, print_hide=1)
-				create_custom_field(self.name, df)
+		if (self.allow_auto_repeat and not frappe.db.exists('Custom Field', {
+		    'fieldname': 'auto_repeat',
+		    'dt': self.name
+		}) and not frappe.db.exists('DocField', {
+		    'fieldname': 'auto_repeat',
+		    'parent': self.name
+		})):
+			insert_after = self.fields[len(self.fields) - 1].fieldname
+			df = dict(fieldname='auto_repeat', label='Auto Repeat', fieldtype='Link', options='Auto Repeat', insert_after=insert_after, read_only=1, no_copy=1, print_hide=1)
+			create_custom_field(self.name, df)
 
 	def validate_nestedset(self):
 		if not self.get('is_tree'):
@@ -736,11 +742,11 @@ def validate_series(dt, autoname=None, name=None):
 					df.unique = 1
 					break
 
-	if autoname and (not autoname.startswith('field:')) \
-		and (not autoname.startswith('eval:')) \
-		and (not autoname.lower() in ('prompt', 'hash')) \
-		and (not autoname.startswith('naming_series:')) \
-		and (not autoname.startswith('format:')):
+	if (autoname and not autoname.startswith('field:')
+	    and not autoname.startswith('eval:')
+	    and autoname.lower() not in ('prompt', 'hash')
+	    and not autoname.startswith('naming_series:')
+	    and not autoname.startswith('format:')):
 
 		prefix = autoname.split('.')[0]
 		doctype = frappe.qb.DocType("DocType")
@@ -832,18 +838,17 @@ def validate_fields(meta):
 		if d.fieldtype in ("Link",) + table_fields:
 			if not d.options:
 				frappe.throw(_("{0}: Options required for Link or Table type field {1} in row {2}").format(docname, d.label, d.idx), DoctypeLinkError)
-			if d.options=="[Select]" or d.options==d.parent:
+			if d.options in ["[Select]", d.parent]:
 				return
-			if d.options != d.parent:
-				options = frappe.db.get_value("DocType", d.options, "name")
-				if not options:
-					frappe.throw(_("{0}: Options must be a valid DocType for field {1} in row {2}").format(docname, d.label, d.idx), WrongOptionsDoctypeLinkError)
-				elif not (options == d.options):
-					frappe.throw(_("{0}: Options {1} must be the same as doctype name {2} for the field {3}")
-						.format(docname, d.options, options, d.label), DoctypeLinkError)
-				else:
-					# fix case
-					d.options = options
+			options = frappe.db.get_value("DocType", d.options, "name")
+			if not options:
+				frappe.throw(_("{0}: Options must be a valid DocType for field {1} in row {2}").format(docname, d.label, d.idx), WrongOptionsDoctypeLinkError)
+			elif options != d.options:
+				frappe.throw(_("{0}: Options {1} must be the same as doctype name {2} for the field {3}")
+					.format(docname, d.options, options, d.label), DoctypeLinkError)
+			else:
+				# fix case
+				d.options = options
 
 	def check_hidden_and_mandatory(docname, d):
 		if d.hidden and d.reqd and not d.default:
@@ -1009,7 +1014,7 @@ def validate_fields(meta):
 				sort_fields = [d.split()[0] for d in meta.sort_field.split(',')]
 
 			for fieldname in sort_fields:
-				if not fieldname in fieldname_list + list(default_fields):
+				if fieldname not in fieldname_list + list(default_fields):
 					frappe.throw(_("Sort field {0} must be a valid fieldname").format(fieldname),
 						InvalidFieldNameError)
 
@@ -1024,7 +1029,7 @@ def validate_fields(meta):
 
 	def check_table_multiselect_option(docfield):
 		'''check if the doctype provided in Option has atleast 1 Link field'''
-		if not docfield.fieldtype == 'Table MultiSelect': return
+		if docfield.fieldtype != 'Table MultiSelect': return
 
 		doctype = docfield.options
 		meta = frappe.get_meta(doctype)
@@ -1050,13 +1055,14 @@ def validate_fields(meta):
 			field.fetch_from = field.fetch_from.strip('\n').strip()
 
 	def validate_data_field_type(docfield):
-		if docfield.fieldtype == "Data" and not (docfield.oldfieldtype and docfield.oldfieldtype != "Data"):
-			if docfield.options and (docfield.options not in data_field_options):
-				df_str = frappe.bold(_(docfield.label))
-				text_str = _("{0} is an invalid Data field.").format(df_str) + "<br>" * 2 + _("Only Options allowed for Data field are:") + "<br>"
-				df_options_str = "<ul><li>" + "</li><li>".join(_(x) for x in data_field_options) + "</ul>"
+		if (docfield.fieldtype == "Data"
+		    and not (docfield.oldfieldtype and docfield.oldfieldtype != "Data")
+		    and docfield.options and (docfield.options not in data_field_options)):
+			df_str = frappe.bold(_(docfield.label))
+			text_str = _("{0} is an invalid Data field.").format(df_str) + "<br>" * 2 + _("Only Options allowed for Data field are:") + "<br>"
+			df_options_str = "<ul><li>" + "</li><li>".join(_(x) for x in data_field_options) + "</ul>"
 
-				frappe.msgprint(text_str + df_options_str, title="Invalid Data Field", raise_exception=True)
+			frappe.msgprint(text_str + df_options_str, title="Invalid Data Field", raise_exception=True)
 
 	def check_child_table_option(docfield):
 
@@ -1075,9 +1081,9 @@ def validate_fields(meta):
 			frappe.throw('Max for {} height must be in px, em, rem'.format(frappe.bold(docfield.fieldname)))
 
 	def check_no_of_ratings(docfield):
-		if docfield.fieldtype == "Rating":
-			if docfield.options and (int(docfield.options) > 10 or int(docfield.options) < 3):
-				frappe.throw(_('Options for Rating field can range from 3 to 10'))
+		if (docfield.fieldtype == "Rating" and docfield.options
+		    and (int(docfield.options) > 10 or int(docfield.options) < 3)):
+			frappe.throw(_('Options for Rating field can range from 3 to 10'))
 
 	fields = meta.get("fields")
 	fieldname_list = [d.fieldname for d in fields]
@@ -1171,29 +1177,26 @@ def validate_permissions(doctype, for_remove=False, alert=False):
 		has_similar = False
 		similar_because_of = ""
 		for p in permissions:
-			if p.role==d.role and p.permlevel==d.permlevel and p!=d:
-				if p.if_owner==d.if_owner:
-					similar_because_of = _("If Owner")
-					has_similar = True
-					break
+			if (p.role == d.role and p.permlevel == d.permlevel and p != d
+			    and p.if_owner == d.if_owner):
+				similar_because_of = _("If Owner")
+				has_similar = True
+				break
 
 		if has_similar:
 			frappe.throw(_("{0}: Only one rule allowed with the same Role, Level and {1}")\
 				.format(get_txt(d),	similar_because_of))
 
 	def check_level_zero_is_set(d):
-		if cint(d.permlevel) > 0 and d.role != 'All':
-			has_zero_perm = False
-			for p in permissions:
-				if p.role==d.role and (p.permlevel or 0)==0 and p!=d:
-					has_zero_perm = True
-					break
+		if cint(d.permlevel) <= 0 or d.role == 'All':
+			return
+		has_zero_perm = any(p.role == d.role and (p.permlevel or 0) == 0 and p != d
+		                    for p in permissions)
+		if not has_zero_perm:
+			frappe.throw(_("{0}: Permission at level 0 must be set before higher levels are set").format(get_txt(d)))
 
-			if not has_zero_perm:
-				frappe.throw(_("{0}: Permission at level 0 must be set before higher levels are set").format(get_txt(d)))
-
-			for invalid in ("create", "submit", "cancel", "amend"):
-				if d.get(invalid): d.set(invalid, 0)
+		for invalid in ("create", "submit", "cancel", "amend"):
+			if d.get(invalid): d.set(invalid, 0)
 
 	def check_permission_dependency(d):
 		if d.cancel and not d.submit:
@@ -1290,9 +1293,7 @@ def make_module_and_roles(doc, perm_fieldname="permissions"):
 	except frappe.DoesNotExistError as e:
 		pass
 	except frappe.db.ProgrammingError as e:
-		if frappe.db.is_table_missing(e):
-			pass
-		else:
+		if not frappe.db.is_table_missing(e):
 			raise
 
 def check_fieldname_conflicts(doctype, fieldname):
@@ -1334,7 +1335,7 @@ def check_email_append_to(doc):
 	if doc.sender_field and not sender_field:
 		frappe.throw(_("Select a valid Sender Field for creating documents from Email"))
 
-	if not sender_field.options == "Email":
+	if sender_field.options != "Email":
 		frappe.throw(_("Sender Field should have Email in options"))
 
 

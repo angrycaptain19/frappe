@@ -10,7 +10,7 @@ class DomainSettings(Document):
 		active_domains = [d.domain for d in self.active_domains]
 		added = False
 		for d in domains:
-			if not d in active_domains:
+			if d not in active_domains:
 				self.append('active_domains', dict(domain=d))
 				added = True
 
@@ -75,11 +75,11 @@ def get_active_domains():
 def get_active_modules():
 	""" get the active modules from Module Def"""
 	def _get_active_modules():
-		active_modules = []
 		active_domains = get_active_domains()
-		for m in frappe.get_all("Module Def", fields=['name', 'restrict_to_domain']):
-			if (not m.restrict_to_domain) or (m.restrict_to_domain in active_domains):
-				active_modules.append(m.name)
-		return active_modules
+		return [
+		    m.name for m in frappe.get_all(
+		        "Module Def", fields=['name', 'restrict_to_domain'])
+		    if (not m.restrict_to_domain) or (m.restrict_to_domain in active_domains)
+		]
 
 	return frappe.cache().get_value('active_modules', _get_active_modules)

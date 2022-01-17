@@ -99,19 +99,19 @@ def send_document_follow_mails(frequency):
 
 	sorted_users = sorted(users, key=lambda k: k['user'])
 
-	grouped_by_user = {}
-	for k, v in groupby(sorted_users, key=lambda k: k['user']):
-		grouped_by_user[k] = list(v)
-
-	for user in grouped_by_user:
+	grouped_by_user = {
+	    k: list(v)
+	    for k, v in groupby(sorted_users, key=lambda k: k['user'])
+	}
+	for user, value in grouped_by_user.items():
 		user_frequency = frappe.db.get_value("User", user, "document_follow_frequency")
-		message = []
-		valid_document_follows = []
 		if user_frequency == frequency:
-			for d in grouped_by_user[user]:
+			message = []
+			valid_document_follows = []
+			for d in value:
 				content = get_message(d.ref_docname, d.ref_doctype, frequency, user)
 				if content:
-					message = message + content
+					message += content
 					valid_document_follows.append({
 						"reference_docname": d.ref_docname,
 						"reference_doctype": d.ref_doctype,
@@ -141,7 +141,7 @@ def get_version(doctype, doc_name, frequency, user):
 			if change.added:
 				timeline_items = get_added_row(change.added, time, doctype, doc_name, v)
 
-			timeline = timeline + timeline_items
+			timeline += timeline_items
 
 	return timeline
 
@@ -202,9 +202,9 @@ def get_row_changed(row_changed, time, doctype, doc_name, v):
 
 	items = []
 	for d in row_changed:
-		d[2] = d[2] if d[2] else ' '
-		d[0] = d[0] if d[0] else ' '
-		d[3][0][1] = d[3][0][1] if d[3][0][1] else ' '
+		d[2] = d[2] or ' '
+		d[0] = d[0] or ' '
+		d[3][0][1] = d[3][0][1] or ' '
 		items.append({
 			"time": v.modified,
 			"data": {
@@ -223,9 +223,7 @@ def get_row_changed(row_changed, time, doctype, doc_name, v):
 	return items
 
 def get_added_row(added, time, doctype, doc_name, v):
-	items = []
-	for d in added:
-		items.append({
+	return [{
 			"time": v.modified,
 			"data": {
 					"to": d[0],
@@ -235,17 +233,16 @@ def get_added_row(added, time, doctype, doc_name, v):
 			"doc_name": doc_name,
 			"type": "row added",
 			"by": v.modified_by
-		})
-	return items
+		} for d in added]
 
 def get_field_changed(changed, time, doctype, doc_name, v):
 	from html2text import html2text
 
 	items = []
 	for d in changed:
-		d[1] = d[1] if d[1] else ' '
-		d[2] = d[2] if d[2] else ' '
-		d[0] = d[0] if d[0] else ' '
+		d[1] = d[1] or ' '
+		d[2] = d[2] or ' '
+		d[0] = d[0] or ' '
 		items.append({
 			"time": v.modified,
 			"data": {

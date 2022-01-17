@@ -95,21 +95,20 @@ def get_permission_query_conditions(doctype):
 		return ""
 
 	elif not links.get("permitted_links"):
-		conditions = []
-
-		# when everything is not permitted
-		for df in links.get("not_permitted_links"):
-			# like ifnull(customer, '')='' and ifnull(supplier, '')=''
-			conditions.append("ifnull(`tab{doctype}`.`{fieldname}`, '')=''".format(doctype=doctype, fieldname=df.fieldname))
+		conditions = [
+		    "ifnull(`tab{doctype}`.`{fieldname}`, '')=''".format(
+		        doctype=doctype, fieldname=df.fieldname)
+		    for df in links.get("not_permitted_links")
+		]
 
 		return "( " + " and ".join(conditions) + " )"
 
 	else:
-		conditions = []
-
-		for df in links.get("permitted_links"):
-			# like ifnull(customer, '')!='' or ifnull(supplier, '')!=''
-			conditions.append("ifnull(`tab{doctype}`.`{fieldname}`, '')!=''".format(doctype=doctype, fieldname=df.fieldname))
+		conditions = [
+		    "ifnull(`tab{doctype}`.`{fieldname}`, '')!=''".format(
+		        doctype=doctype, fieldname=df.fieldname)
+		    for df in links.get("permitted_links")
+		]
 
 		return "( " + " or ".join(conditions) + " )"
 
@@ -162,7 +161,8 @@ def filter_dynamic_link_doctypes(doctype, txt, searchfield, start, page_len, fil
 	_doctypes = frappe.db.get_all("Custom Field", filters=filters, fields=["dt"],
 		as_list=True)
 
-	_doctypes = tuple([d for d in _doctypes if re.search(txt+".*", _(d[0]), re.IGNORECASE)])
+	_doctypes = tuple(
+	    d for d in _doctypes if re.search(txt + ".*", _(d[0]), re.IGNORECASE))
 
 	all_doctypes = [d[0] for d in doctypes + _doctypes]
 	allowed_doctypes = frappe.permissions.get_doctypes_with_read()

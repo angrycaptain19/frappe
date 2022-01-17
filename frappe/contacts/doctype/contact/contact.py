@@ -137,13 +137,12 @@ def get_default_contact(doctype, name):
 			dl.link_name=%s and
 			dl.parenttype = "Contact"''', (doctype, name), as_dict=True)
 
-	if out:
-		for contact in out:
-			if contact.is_primary_contact:
-				return contact.parent
-		return out[0].parent
-	else:
+	if not out:
 		return None
+	for contact in out:
+		if contact.is_primary_contact:
+			return contact.parent
+	return out[0].parent
 
 @frappe.whitelist()
 def invite_user(contact):
@@ -167,17 +166,30 @@ def invite_user(contact):
 @frappe.whitelist()
 def get_contact_details(contact):
 	contact = frappe.get_doc("Contact", contact)
-	out = {
-		"contact_person": contact.get("name"),
-		"contact_display": " ".join(filter(None,
-			[contact.get("salutation"), contact.get("first_name"), contact.get("last_name")])),
-		"contact_email": contact.get("email_id"),
-		"contact_mobile": contact.get("mobile_no"),
-		"contact_phone": contact.get("phone"),
-		"contact_designation": contact.get("designation"),
-		"contact_department": contact.get("department")
+	return {
+	    "contact_person":
+	    contact.get("name"),
+	    "contact_display":
+	    " ".join(
+	        filter(
+	            None,
+	            [
+	                contact.get("salutation"),
+	                contact.get("first_name"),
+	                contact.get("last_name"),
+	            ],
+	        )),
+	    "contact_email":
+	    contact.get("email_id"),
+	    "contact_mobile":
+	    contact.get("mobile_no"),
+	    "contact_phone":
+	    contact.get("phone"),
+	    "contact_designation":
+	    contact.get("designation"),
+	    "contact_department":
+	    contact.get("department"),
 	}
-	return out
 
 def update_contact(doc, method):
 	'''Update contact when user is updated, if contact is found. Called via hooks'''

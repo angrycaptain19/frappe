@@ -71,27 +71,28 @@ class Communication(Document, CommunicationEmailMixin):
 		self.set_sender_full_name()
 
 	def validate_reference(self):
-		if self.reference_doctype and self.reference_name:
-			if not self.reference_owner:
-				self.reference_owner = frappe.db.get_value(self.reference_doctype, self.reference_name, "owner")
+		if not self.reference_doctype or not self.reference_name:
+			return
+		if not self.reference_owner:
+			self.reference_owner = frappe.db.get_value(self.reference_doctype, self.reference_name, "owner")
 
-			# prevent communication against a child table
-			if frappe.get_meta(self.reference_doctype).istable:
-				frappe.throw(_("Cannot create a {0} against a child document: {1}")
-					.format(_(self.communication_type), _(self.reference_doctype)))
+		# prevent communication against a child table
+		if frappe.get_meta(self.reference_doctype).istable:
+			frappe.throw(_("Cannot create a {0} against a child document: {1}")
+				.format(_(self.communication_type), _(self.reference_doctype)))
 
-			# Prevent circular linking of Communication DocTypes
-			if self.reference_doctype == "Communication":
-				circular_linking = False
-				doc = get_parent_doc(self)
-				while doc.reference_doctype == "Communication":
-					if get_parent_doc(doc).name==self.name:
-						circular_linking = True
-						break
-					doc = get_parent_doc(doc)
+		# Prevent circular linking of Communication DocTypes
+		if self.reference_doctype == "Communication":
+			circular_linking = False
+			doc = get_parent_doc(self)
+			while doc.reference_doctype == "Communication":
+				if get_parent_doc(doc).name==self.name:
+					circular_linking = True
+					break
+				doc = get_parent_doc(doc)
 
-				if circular_linking:
-					frappe.throw(_("Please make sure the Reference Communication Docs are not circularly linked."), frappe.CircularLinkingError)
+			if circular_linking:
+				frappe.throw(_("Please make sure the Reference Communication Docs are not circularly linked."), frappe.CircularLinkingError)
 
 	def after_insert(self):
 		if not (self.reference_doctype and self.reference_name):
@@ -139,7 +140,10 @@ class Communication(Document, CommunicationEmailMixin):
 		"""
 		emails = split_emails(emails) if isinstance(emails, str) else (emails or [])
 		if exclude_displayname:
-			return [email.lower() for email in set([parse_addr(email)[1] for email in emails]) if email]
+			return [
+			    email.lower() for email in {parse_addr(email)[1]
+			                                for email in emails} if email
+			]
 		return [email.lower() for email in set(emails) if email]
 
 	def to_list(self, exclude_displayname = True):
@@ -158,12 +162,11 @@ class Communication(Document, CommunicationEmailMixin):
 		return self._get_emails_list(self.bcc, exclude_displayname=exclude_displayname)
 
 	def get_attachments(self):
-		attachments = frappe.get_all(
+		return frappe.get_all(
 			"File",
 			fields=["name", "file_name", "file_url", "is_private"],
 			filters = {"attached_to_name": self.name, "attached_to_doctype": self.DOCTYPE}
 		)
-		return attachments
 
 	def notify_change(self, action):
 		frappe.publish_realtime('update_docinfo_for_{}_{}'.format(self.reference_doctype, self.reference_name), {
@@ -208,35 +211,36 @@ class Communication(Document, CommunicationEmailMixin):
 		frappe.db.set_value(self.DOCTYPE, self.name, kwargs)
 
 	def set_sender_full_name(self):
-		if not self.sender_full_name and self.sender:
-			if self.sender == "Administrator":
-				self.sender_full_name = frappe.db.get_value("User", "Administrator", "full_name")
-				self.sender = frappe.db.get_value("User", "Administrator", "email")
-			elif self.sender == "Guest":
-				self.sender_full_name = self.sender
-				self.sender = None
-			else:
-				if self.sent_or_received=='Sent':
-					validate_email_address(self.sender, throw=True)
-				sender_name, sender_email = parse_addr(self.sender)
-				if sender_name == sender_email:
-					sender_name = None
+		if self.sender_full_name or not self.sender:
+			return
+		if self.sender == "Administrator":
+			self.sender_full_name = frappe.db.get_value("User", "Administrator", "full_name")
+			self.sender = frappe.db.get_value("User", "Administrator", "email")
+		elif self.sender == "Guest":
+			self.sender_full_name = self.sender
+			self.sender = None
+		else:
+			if self.sent_or_received=='Sent':
+				validate_email_address(self.sender, throw=True)
+			sender_name, sender_email = parse_addr(self.sender)
+			if sender_name == sender_email:
+				sender_name = None
 
-				self.sender = sender_email
-				self.sender_full_name = sender_name
+			self.sender = sender_email
+			self.sender_full_name = sender_name
 
-				if not self.sender_full_name:
-					self.sender_full_name = frappe.db.get_value('User', self.sender, 'full_name')
+			if not self.sender_full_name:
+				self.sender_full_name = frappe.db.get_value('User', self.sender, 'full_name')
 
-				if not self.sender_full_name:
-					first_name, last_name = frappe.db.get_value('Contact',
-						filters={'email_id': sender_email},
-						fieldname=['first_name', 'last_name']
-					) or [None, None]
-					self.sender_full_name = (first_name or '') + (last_name or '')
+			if not self.sender_full_name:
+				first_name, last_name = frappe.db.get_value('Contact',
+					filters={'email_id': sender_email},
+					fieldname=['first_name', 'last_name']
+				) or [None, None]
+				self.sender_full_name = (first_name or '') + (last_name or '')
 
-				if not self.sender_full_name:
-					self.sender_full_name = sender_email
+			if not self.sender_full_name:
+				self.sender_full_name = sender_email
 
 	def bot_reply(self):
 		if self.comment_type == 'Bot' and self.communication_type == 'Chat':
@@ -297,20 +301,21 @@ class Communication(Document, CommunicationEmailMixin):
 			add_contact_links_to_communication(self, contact_name)
 
 	def deduplicate_timeline_links(self):
-		if self.timeline_links:
-			links, duplicate = [], False
+		if not self.timeline_links:
+			return
+		links, duplicate = [], False
 
-			for l in self.timeline_links:
-				t = (l.link_doctype, l.link_name)
-				if not t in links:
-					links.append(t)
-				else:
-					duplicate = True
+		for l in self.timeline_links:
+			t = (l.link_doctype, l.link_name)
+			if t not in links:
+				links.append(t)
+			else:
+				duplicate = True
 
-			if duplicate:
-				del self.timeline_links[:] # make it python 2 compatible as list.clear() is python 3 only
-				for l in links:
-					self.add_link(link_doctype=l[0], link_name=l[1])
+		if duplicate:
+			del self.timeline_links[:] # make it python 2 compatible as list.clear() is python 3 only
+			for l in links:
+				self.add_link(link_doctype=l[0], link_name=l[1])
 
 	def add_link(self, link_doctype, link_name, autosave=False):
 		self.append("timeline_links",
@@ -344,9 +349,9 @@ def has_permission(doc, ptype, user):
 		if doc.reference_doctype == "Communication" and doc.reference_name == doc.name:
 			return
 
-		if doc.reference_doctype and doc.reference_name:
-			if frappe.has_permission(doc.reference_doctype, ptype="read", doc=doc.reference_name):
-				return True
+		if (doc.reference_doctype and doc.reference_name and frappe.has_permission(
+		    doc.reference_doctype, ptype="read", doc=doc.reference_name)):
+			return True
 
 def get_permission_query_conditions_for_communication(user):
 	if not user: user = frappe.session.user
@@ -355,17 +360,16 @@ def get_permission_query_conditions_for_communication(user):
 
 	if "Super Email User" in roles or "System Manager" in roles:
 		return None
-	else:
-		accounts = frappe.get_all("User Email", filters={ "parent": user },
-			fields=["email_account"],
-			distinct=True, order_by="idx")
+	accounts = frappe.get_all("User Email", filters={ "parent": user },
+		fields=["email_account"],
+		distinct=True, order_by="idx")
 
-		if not accounts:
-			return """`tabCommunication`.communication_medium!='Email'"""
+	if not accounts:
+		return """`tabCommunication`.communication_medium!='Email'"""
 
-		email_accounts = [ '"%s"'%account.get("email_account") for account in accounts ]
-		return """`tabCommunication`.email_account in ({email_accounts})"""\
-			.format(email_accounts=','.join(email_accounts))
+	email_accounts = [ '"%s"'%account.get("email_account") for account in accounts ]
+	return """`tabCommunication`.email_account in ({email_accounts})"""\
+		.format(email_accounts=','.join(email_accounts))
 
 def get_contacts(email_strings, auto_create_contact=False):
 	email_addrs = []
@@ -432,7 +436,7 @@ def parse_email(communication, email_strings):
 				if delimiter in email:
 					email = email.split("@")[0]
 					email_local_parts = email.split(delimiter)
-					if not len(email_local_parts) == 3:
+					if len(email_local_parts) != 3:
 						continue
 
 					doctype = unquote(email_local_parts[1])
@@ -485,34 +489,37 @@ def update_parent_document_on_communication(doc):
 	parent.notify_update()
 
 def update_first_response_time(parent, communication):
-	if parent.meta.has_field("first_response_time") and not parent.get("first_response_time"):
-		if is_system_user(communication.sender):
-			if communication.sent_or_received == "Sent":
-				first_responded_on = communication.creation
-				if parent.meta.has_field("first_responded_on"):
-					parent.db_set("first_responded_on", first_responded_on)
-				first_response_time = round(time_diff_in_seconds(first_responded_on, parent.creation), 2)
-				parent.db_set("first_response_time", first_response_time)
+	if (parent.meta.has_field("first_response_time")
+	    and not parent.get("first_response_time")
+	    and is_system_user(communication.sender)
+	    and communication.sent_or_received == "Sent"):
+		first_responded_on = communication.creation
+		if parent.meta.has_field("first_responded_on"):
+			parent.db_set("first_responded_on", first_responded_on)
+		first_response_time = round(time_diff_in_seconds(first_responded_on, parent.creation), 2)
+		parent.db_set("first_response_time", first_response_time)
 
 def set_avg_response_time(parent, communication):
-	if parent.meta.has_field("avg_response_time") and communication.sent_or_received == "Sent":
-		# avg response time for all the responses
-		communications = frappe.get_list("Communication", filters={
-				"reference_doctype": parent.doctype,
-				"reference_name": parent.name
-			},
-			fields=["sent_or_received", "name", "creation"],
-			order_by="creation"
-		)
+	if (not parent.meta.has_field("avg_response_time")
+	    or communication.sent_or_received != "Sent"):
+		return
+	# avg response time for all the responses
+	communications = frappe.get_list("Communication", filters={
+			"reference_doctype": parent.doctype,
+			"reference_name": parent.name
+		},
+		fields=["sent_or_received", "name", "creation"],
+		order_by="creation"
+	)
 
-		if len(communications):
-			response_times = []
-			for i in range(len(communications)):
-				if communications[i].sent_or_received == "Sent" and communications[i-1].sent_or_received == "Received":
-					response_time = round(time_diff_in_seconds(communications[i].creation, communications[i-1].creation), 2)
-					if response_time > 0:
-						response_times.append(response_time)
-			if response_times:
-				avg_response_time = sum(response_times) / len(response_times)
-				parent.db_set("avg_response_time", avg_response_time)
+	if len(communications):
+		response_times = []
+		for i in range(len(communications)):
+			if communications[i].sent_or_received == "Sent" and communications[i-1].sent_or_received == "Received":
+				response_time = round(time_diff_in_seconds(communications[i].creation, communications[i-1].creation), 2)
+				if response_time > 0:
+					response_times.append(response_time)
+		if response_times:
+			avg_response_time = sum(response_times) / len(response_times)
+			parent.db_set("avg_response_time", avg_response_time)
 

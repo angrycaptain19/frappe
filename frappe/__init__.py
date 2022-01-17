@@ -102,7 +102,7 @@ def as_unicode(text, encoding='utf-8'):
 	'''Convert to unicode if required'''
 	if isinstance(text, str):
 		return text
-	elif text==None:
+	elif text is None:
 		return ''
 	elif isinstance(text, bytes):
 		return str(text, encoding)
@@ -287,10 +287,9 @@ def get_conf(site=None):
 	if hasattr(local, 'conf'):
 		return local.conf
 
-	else:
-		# if no site, get from common_site_config.json
-		with init_site(site):
-			return local.conf
+	# if no site, get from common_site_config.json
+	with init_site(site):
+		return local.conf
 
 class init_site:
 	def __init__(self, site=None):
@@ -332,7 +331,7 @@ def errprint(msg):
 
 	:param msg: Message."""
 	msg = as_unicode(msg)
-	if not request or (not "cmd" in local.form_dict) or conf.developer_mode:
+	if not request or "cmd" not in local.form_dict or conf.developer_mode:
 		print(msg)
 
 	error_log.append({"exc": msg})
@@ -344,9 +343,8 @@ def log(msg):
 	"""Add to `debug_log`.
 
 	:param msg: Message."""
-	if not request:
-		if conf.get("logging") or False:
-			print(repr(msg))
+	if not request and (conf.get("logging") or False):
+		print(repr(msg))
 
 	debug_log.append(as_unicode(msg))
 
@@ -428,11 +426,7 @@ def clear_messages():
 	local.message_log = []
 
 def get_message_log():
-	log = []
-	for msg_out in local.message_log:
-		log.append(json.loads(msg_out))
-
-	return log
+	return [json.loads(msg_out) for msg_out in local.message_log]
 
 def clear_last_message():
 	if len(local.message_log) > 0:
@@ -730,10 +724,7 @@ def only_has_select_perm(doctype, user=None, ignore_permissions=False):
 	import frappe.permissions
 	permissions = frappe.permissions.get_role_permissions(doctype, user=user)
 
-	if permissions.get('select') and not permissions.get('read'):
-		return True
-	else:
-		return False
+	return bool(permissions.get('select') and not permissions.get('read'))
 
 def has_permission(doctype=None, ptype="read", doc=None, user=None, verbose=False, throw=False, parent_doctype=None):
 	"""Raises `frappe.PermissionError` if not permitted.
@@ -1032,7 +1023,7 @@ def get_pymodule_path(modulename, *joins):
 
 	:param modulename: Python module name.
 	:param *joins: Join additional path elements using `os.path.join`."""
-	if not "public" in joins:
+	if "public" not in joins:
 		joins = [scrub(part) for part in joins]
 	return os.path.join(os.path.dirname(get_module(scrub(modulename)).__file__ or ''), *joins)
 
@@ -1110,10 +1101,6 @@ def get_hooks(hook=None, default=None, app_name=None):
 			try:
 				app_hooks = get_module(app + ".hooks")
 			except ImportError:
-				if local.flags.in_install_app:
-					# if app is not installed while restoring
-					# ignore it
-					pass
 				print('Could not find app "{0}"'.format(app_name))
 				if not request:
 					sys.exit(1)
@@ -1239,11 +1226,7 @@ def get_newargs(fn, kwargs):
 		fnargs.extend(inspect.getfullargspec(fn).kwonlyargs)
 		varkw = inspect.getfullargspec(fn).varkw
 
-	newargs = {}
-	for a in kwargs:
-		if (a in fnargs) or varkw:
-			newargs[a] = kwargs.get(a)
-
+	newargs = {a: kwargs.get(a) for a in kwargs if (a in fnargs) or varkw}
 	newargs.pop("ignore_permissions", None)
 	newargs.pop("flags", None)
 
@@ -1428,12 +1411,10 @@ def redirect_to_message(title, html, http_status_code=None, context=None, indica
 	cache().set_value("message_id:{0}".format(message_id), message, expires_in_sec=60)
 	location = '/message?id={0}'.format(message_id)
 
-	if not getattr(local, 'is_ajax', False):
-		local.response["type"] = "redirect"
-		local.response["location"] = location
-
-	else:
+	if getattr(local, 'is_ajax', False):
 		return location
+	local.response["type"] = "redirect"
+	local.response["location"] = location
 
 def build_match_conditions(doctype, as_condition=True):
 	"""Return match (User permissions) for given doctype as list or SQL."""
@@ -1487,7 +1468,7 @@ def get_all(doctype, *args, **kwargs):
 		frappe.get_all("ToDo", fields=["*"], filters = {"description": ("like", "test%")})
 	"""
 	kwargs["ignore_permissions"] = True
-	if not "limit_page_length" in kwargs:
+	if "limit_page_length" not in kwargs:
 		kwargs["limit_page_length"] = 0
 	return get_list(doctype, *args, **kwargs)
 
@@ -1569,10 +1550,7 @@ def get_print(doctype=None, name=None, print_format=None, style=None, html=None,
 	if not html:
 		html = get_response_content("printview")
 
-	if as_pdf:
-		return get_pdf(html, options=pdf_options, output=output)
-	else:
-		return html
+	return get_pdf(html, options=pdf_options, output=output) if as_pdf else html
 
 def attach_print(doctype, name, file_name=None, print_format=None,
 	style=None, html=None, doc=None, lang=None, print_letterhead=True, password=None):
@@ -1661,7 +1639,7 @@ def local_cache(namespace, key, generator, regenerate_if_none=False):
 	if key not in local.cache[namespace]:
 		local.cache[namespace][key] = generator()
 
-	elif local.cache[namespace][key]==None and regenerate_if_none:
+	elif local.cache[namespace][key] is None and regenerate_if_none:
 		# if key exists but the previous result was None
 		local.cache[namespace][key] = generator()
 
@@ -1870,10 +1848,9 @@ def mock(type, size=1, locale='en'):
 	fake = faker.Faker(locale)
 	if type not in dir(fake):
 		raise ValueError('Not a valid mock type.')
-	else:
-		for i in range(size):
-			data = getattr(fake, type)()
-			results.append(data)
+	for _ in range(size):
+		data = getattr(fake, type)()
+		results.append(data)
 
 	from frappe.utils import squashify
 	return squashify(results)

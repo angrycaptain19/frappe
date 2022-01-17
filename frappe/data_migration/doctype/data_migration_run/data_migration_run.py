@@ -79,11 +79,7 @@ class DataMigrationRun(Document):
 			data_migration_connector=self.data_migration_connector,
 			name=('!=', self.name)
 		), 'modified')
-		if last_run_timestamp:
-			condition = dict(modified=('>', last_run_timestamp))
-		else:
-			condition = {}
-		return condition
+		return dict(modified=('>', last_run_timestamp)) if last_run_timestamp else {}
 
 	def begin(self):
 		plan_active_mappings = [m for m in self.get_plan().mappings if m.enabled]
@@ -91,7 +87,7 @@ class DataMigrationRun(Document):
 			'Data Migration Mapping', m.mapping) for m in plan_active_mappings]
 
 		total_pages = 0
-		for m in [mapping for mapping in self.mappings]:
+		for m in list(self.mappings):
 			if m.mapping_type == 'Push':
 				count = float(self.get_count(m))
 				page_count = math.ceil(count / m.page_length)
@@ -110,7 +106,7 @@ class DataMigrationRun(Document):
 		), notify=True, commit=True)
 
 	def complete(self):
-		fields = dict()
+		fields = {}
 
 		push_failed = self.get_log('push_failed', [])
 		pull_failed = self.get_log('pull_failed', [])
@@ -428,8 +424,8 @@ class DataMigrationRun(Document):
 
 	def post_process_doc(self, local_doc=None, remote_doc=None):
 		plan = self.get_plan()
-		doc = plan.post_process_doc(self.current_mapping, local_doc=local_doc, remote_doc=remote_doc)
-		return doc
+		return plan.post_process_doc(
+		    self.current_mapping, local_doc=local_doc, remote_doc=remote_doc)
 
 	def set_log(self, key, value):
 		value = json.dumps(value) if '_failed' in key else value

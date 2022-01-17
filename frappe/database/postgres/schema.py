@@ -34,10 +34,10 @@ class PostgresTable(DBTable):
 		for col in self.columns.values():
 			col.build_for_alter_table(self.current_columns.get(col.fieldname.lower()))
 
-		query = []
-
-		for col in self.add_column:
-			query.append("ADD COLUMN `{}` {}".format(col.fieldname, col.get_definition()))
+		query = [
+		    "ADD COLUMN `{}` {}".format(col.fieldname, col.get_definition())
+		    for col in self.add_column
+		]
 
 		for col in self.change_type:
 			using_clause = ""
@@ -73,22 +73,17 @@ class PostgresTable(DBTable):
 
 			query.append("ALTER COLUMN `{}` SET DEFAULT {}".format(col.fieldname, col_default))
 
-		create_index_query = ""
-		for col in self.add_index:
-			# if index key not exists
-			create_index_query += 'CREATE INDEX IF NOT EXISTS "{index_name}" ON `{table_name}`(`{field}`);'.format(
-				index_name=col.fieldname,
-				table_name=self.table_name,
-				field=col.fieldname)
-
-		drop_index_query = ""
-		for col in self.drop_index:
-			# primary key
-			if col.fieldname != 'name':
-				# if index key exists
-				if not frappe.db.has_index(self.table_name, col.fieldname):
-					drop_index_query += 'DROP INDEX IF EXISTS "{}" ;'.format(col.fieldname)
-
+		create_index_query = "".join(
+		    'CREATE INDEX IF NOT EXISTS "{index_name}" ON `{table_name}`(`{field}`);'.
+		    format(
+		        index_name=col.fieldname,
+		        table_name=self.table_name,
+		        field=col.fieldname,
+		    ) for col in self.add_index)
+		drop_index_query = "".join(
+		    'DROP INDEX IF EXISTS "{}" ;'.format(col.fieldname)
+		    for col in self.drop_index if col.fieldname != 'name'
+		    and not frappe.db.has_index(self.table_name, col.fieldname))
 		if query:
 			try:
 				final_alter_query = "ALTER TABLE `{}` {}".format(self.table_name, ", ".join(query))
